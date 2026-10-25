@@ -21,6 +21,8 @@ jobs:
         run: |
           mkdir -p app/src/main/res/font
           curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
+      - name: Run unit tests
+        run: gradle --no-daemon testDebugUnitTest
       - name: Build APK
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4

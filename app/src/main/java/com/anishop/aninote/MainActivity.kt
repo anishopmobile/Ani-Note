@@ -139,6 +139,11 @@ class MainActivity:ComponentActivity() {
  }},confirmButton={TextButton(onClick={val v=amount.toLongOrNull();if(subject.isNotBlank()&&v!=null&&v>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
  if(picker)PersianPicker(date,{picker=false}){date=it;picker=false}
 }
+internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
+ require(startOffset in 0..6)
+ require(daysInMonth in 28..31)
+ return (startOffset+daysInMonth+6)/7
+}
 @Composable fun PersianPicker(initial:Long,dismiss:()->Unit,selected:(Long)->Unit) {
  val cal=remember(initial){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial}}
  var year by remember(initial){mutableIntStateOf(cal.get(android.icu.util.Calendar.YEAR))}
@@ -157,7 +162,7 @@ class MainActivity:ComponentActivity() {
  val count=remember(year,month){first.getActualMaximum(android.icu.util.Calendar.DAY_OF_MONTH)}
  // Android Calendar: Sunday=1 ... Saturday=7; Saturday is the first Persian weekday.
  val offset=remember(year,month){first.get(android.icu.util.Calendar.DAY_OF_WEEK)%7}
- val rows=(offset+count+6)/7
+ val rows=calendarWeekCount(offset,count)
  AlertDialog(
   onDismissRequest=dismiss,
   shape=RoundedCornerShape(24.dp),
