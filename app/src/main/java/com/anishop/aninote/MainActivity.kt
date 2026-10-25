@@ -107,6 +107,7 @@ class MainActivity:ComponentActivity() {
    }catch(_:Exception){}
   }
  }
+ LaunchedEffect(Unit) { Alarms.sync(context,repo.notes()) }
  LaunchedEffect(Unit) { if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
  fun changeNote(n:Note) { val i=notes.indexOfFirst { it.id==n.id }; if(i>=0){ notes[i]=n; repo.saveNotes(notes) } }
  fun changeAccount(a:Account) { val i=accounts.indexOfFirst { it.id==a.id }; if(i>=0){ accounts[i]=a; repo.saveAccounts(accounts) } }
