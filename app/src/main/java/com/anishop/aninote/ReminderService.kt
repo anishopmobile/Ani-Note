@@ -49,8 +49,12 @@ class ReminderService:Service(){
     prepare()
     start()
    }
-  }catch(_:Exception){release()}
-  val task=Runnable{release();stopSelf()}
+  }catch(e:Exception){android.util.Log.e("AniNoteAlarm","Ringtone playback failed",e);release()}
+  val task=Runnable{
+   release()
+   if(getSharedPreferences("data",0).getBoolean("ring_repeat",false))stopForeground(STOP_FOREGROUND_DETACH)
+   stopSelf()
+  }
   stopTask=task
   handler.postDelayed(task,p.getInt("ring_duration",20).coerceIn(1,300)*1000L)
   return START_NOT_STICKY
