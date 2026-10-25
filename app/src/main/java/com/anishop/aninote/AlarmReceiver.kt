@@ -26,10 +26,11 @@ object Alarms {
 class AlarmReceiver:BroadcastReceiver(){
  override fun onReceive(c:Context,i:Intent){
   val mgr=c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-  mgr.createNotificationChannel(NotificationChannel("reminders","یادآورهای Ani Note",NotificationManager.IMPORTANCE_HIGH))
+  val sound=c.getSharedPreferences("data",0).getString("sound_uri","") ?: ""
+  val channel=NotificationSounds.channel(c,sound)
   if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return
   val open=PendingIntent.getActivity(c,0,Intent(c,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-  mgr.notify((i.getStringExtra("id")?:"").hashCode(),Notification.Builder(c,"reminders").setSmallIcon(android.R.drawable.ic_popup_reminder).setContentTitle(i.getStringExtra("title")?:"یادآوری").setContentText(i.getStringExtra("body")).setStyle(Notification.BigTextStyle().bigText(i.getStringExtra("body"))).setContentIntent(open).setAutoCancel(true).build())
+  mgr.notify((i.getStringExtra("id")?:"").hashCode(),Notification.Builder(c,channel).setSmallIcon(android.R.drawable.ic_popup_reminder).setContentTitle(i.getStringExtra("title")?:"یادآوری").setContentText(i.getStringExtra("body")).setStyle(Notification.BigTextStyle().bigText(i.getStringExtra("body"))).setContentIntent(open).setAutoCancel(true).build())
  }
 }
 class BootReceiver:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){if(i.action==Intent.ACTION_BOOT_COMPLETED)Alarms.sync(c,Repo(c).notes())}}
