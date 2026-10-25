@@ -13,6 +13,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -94,6 +96,17 @@ class MainActivity:ComponentActivity() {
  }
 
  val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
+ val exactAlarmPermission=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){
+  Alarms.sync(context,repo.notes())
+ }
+ LaunchedEffect(Unit){
+  if(Build.VERSION.SDK_INT>=31){
+   val manager=context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+   if(!manager.canScheduleExactAlarms())try{
+    exactAlarmPermission.launch(Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+context.packageName)))
+   }catch(_:Exception){}
+  }
+ }
  LaunchedEffect(Unit) { if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
  fun changeNote(n:Note) { val i=notes.indexOfFirst { it.id==n.id }; if(i>=0){ notes[i]=n; repo.saveNotes(notes) } }
  fun changeAccount(a:Account) { val i=accounts.indexOfFirst { it.id==a.id }; if(i>=0){ accounts[i]=a; repo.saveAccounts(accounts) } }
@@ -105,7 +118,7 @@ class MainActivity:ComponentActivity() {
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
  } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
  floatingActionButton={ if(openNote==null && openAccount==null && tab!=2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
- ) { padding -> Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+ ) { padding -> Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
  when {
  openNote!=null -> { val n=notes.firstOrNull{it.id==openNote}; if(n!=null) NoteEditor(n,::changeNote,{notes.removeAll{it.id==n.id};repo.saveNotes(notes);openNote=null},{exportPdf(n.parts.firstOrNull()?.title ?: "یادداشت",n.parts.flatMapIndexed{index,p->listOf("بخش "+(index+1)+" — "+p.title,p.body)+ (if(p.alarm>0)listOf("یادآوری: "+jalali(p.alarm)+" "+clock(p.alarm))else emptyList())})}) }
  openAccount!=null -> { val a=accounts.firstOrNull{it.id==openAccount}; if(a!=null) AccountEditor(a,::changeAccount,{accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts);openAccount=null},{exportPdf(a.title,listOf("مانده حساب: "+money(a.entries.sumOf{it.amount})) + a.entries.map{it.subject+" | "+money(it.amount)+" | "+jalali(it.date)})}) }
@@ -188,7 +201,7 @@ class MainActivity:ComponentActivity() {
   if(datePicker) PersianPicker(if(part.alarm>0)part.alarm else System.currentTimeMillis(),{datePicker=false}){date->
    datePicker=false
    val cal=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=date}
-   TimePickerDialog(context,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it}))},9,0,true).show()
+   TimePickerDialog(context,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it})) else android.widget.Toast.makeText(context,"زمان یادآوری باید در آینده باشد",1).show()},9,0,true).show()
   }
  }
  item { OutlinedButton(onClick={update(n.copy(parts=n.parts+Part()))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PostAdd,null);Text(" Page Break • بخش جدید")} }
