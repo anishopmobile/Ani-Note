@@ -5,6 +5,8 @@ import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
 import android.os.*
+import android.media.RingtoneManager
+import android.net.Uri
 import android.icu.util.Calendar as PersianCalendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -62,6 +64,32 @@ class MainActivity:ComponentActivity() {
  val accounts=remember { mutableStateListOf<Account>().apply { addAll(repo.accounts()) } }
  var tab by remember { mutableIntStateOf(0) }; var openNote by remember { mutableStateOf<String?>(null) }; var openAccount by remember { mutableStateOf<String?>(null) }
  var newAccount by remember { mutableStateOf(false) }; var accountName by remember { mutableStateOf("") }
+ var deletingNote by remember { mutableStateOf<String?>(null) }
+ var deletingAccount by remember { mutableStateOf<String?>(null) }
+ var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+ var importedBackup by remember { mutableStateOf<String?>(null) }
+ var sound by remember { mutableStateOf(repo.p.getString("sound_uri","") ?: "") }
+ val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
+  if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",0).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",1).show()}
+ }
+ val backupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+  if(uri!=null)try {context.contentResolver.openOutputStream(uri)?.use{it.write(BackupCodec.export(repo).toByteArray(Charsets.UTF_8))};android.widget.Toast.makeText(context,"بکاپ ذخیره شد",0).show()}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تهیه بکاپ",1).show()}
+ }
+ val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+  if(uri!=null)try {val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()} ?: byteArrayOf();require(bytes.size<=10_000_000){"فایل بیش از حد بزرگ است"};val json=bytes.toString(Charsets.UTF_8);BackupCodec.validate(json);importedBackup=json}catch(e:Exception){android.widget.Toast.makeText(context,"فایل بکاپ معتبر نیست",1).show()}
+ }
+ val ringtoneLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){result->
+  if(result.resultCode==android.app.Activity.RESULT_OK){
+   @Suppress("DEPRECATION") val uri=if(Build.VERSION.SDK_INT>=33)result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI,Uri::class.java)else result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+   sound=uri?.toString() ?: ""
+   repo.p.edit().putString("sound_uri",sound).apply()
+   NotificationSounds.channel(context,sound)
+  }
+ }
+ fun exportPdf(title:String,lines:List<String>){
+  try {pendingExport=PdfReports.create(context,title,lines);pdfLauncher.launch("AniNote-"+System.currentTimeMillis()+".pdf")}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تولید PDF",1).show()}
+ }
+
  val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
  LaunchedEffect(Unit) { if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
  fun changeNote(n:Note) { val i=notes.indexOfFirst { it.id==n.id }; if(i>=0){ notes[i]=n; repo.saveNotes(notes) } }
@@ -72,30 +100,59 @@ class MainActivity:ComponentActivity() {
   if(openNote!=null || openAccount!=null) IconButton(onClick={openNote=null;openAccount=null}){ Icon(Icons.Default.ArrowForward,"بازگشت") }
   Column(Modifier.weight(1f)) { Text("Ani Note",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
- } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}) } },
- floatingActionButton={ if(openNote==null && openAccount==null) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
+ } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
+ floatingActionButton={ if(openNote==null && openAccount==null && tab!=2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
  ) { padding -> Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
  when {
- openNote!=null -> { val n=notes.firstOrNull{it.id==openNote}; if(n!=null) NoteEditor(n,::changeNote,{notes.removeAll{it.id==n.id};repo.saveNotes(notes);openNote=null}) }
- openAccount!=null -> { val a=accounts.firstOrNull{it.id==openAccount}; if(a!=null) AccountEditor(a,::changeAccount,{accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts);openAccount=null}) }
+ openNote!=null -> { val n=notes.firstOrNull{it.id==openNote}; if(n!=null) NoteEditor(n,::changeNote,{notes.removeAll{it.id==n.id};repo.saveNotes(notes);openNote=null},{exportPdf(n.parts.firstOrNull()?.title ?: "یادداشت",n.parts.flatMapIndexed{index,p->listOf("بخش "+(index+1)+" — "+p.title,p.body)+ (if(p.alarm>0)listOf("یادآوری: "+jalali(p.alarm)+" "+clock(p.alarm))else emptyList())})}) }
+ openAccount!=null -> { val a=accounts.firstOrNull{it.id==openAccount}; if(a!=null) AccountEditor(a,::changeAccount,{accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts);openAccount=null},{exportPdf(a.title,listOf("مانده حساب: "+money(a.entries.sumOf{it.amount})) + a.entries.map{it.subject+" | "+money(it.amount)+" | "+jalali(it.date)})}) }
  tab==0 -> { var q by remember { mutableStateOf("") }; Text("یادداشت‌های من",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(10.dp))
   OutlinedTextField(q,{q=it},Modifier.fillMaxWidth(),placeholder={Text("جستجو...")},leadingIcon={Icon(Icons.Default.Search,null)})
   Spacer(Modifier.height(12.dp))
   LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)) { items(notes.filter{n->n.parts.any{it.title.contains(q,true)||it.body.contains(q,true)}},key={it.id}) { n ->
-   ElevatedCard(onClick={openNote=n.id},modifier=Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)) {Text(n.parts.firstOrNull()?.title?.ifBlank{"بدون عنوان"}?:"بدون عنوان",style=MaterialTheme.typography.titleMedium);Text("${n.parts.size} بخش",color=Color.Gray);if(n.parts.any{it.alarm>0})Text("⏰ دارای یادآور",color=blue) }; IconButton(onClick={notes.removeAll{it.id==n.id};repo.saveNotes(notes)}){Icon(Icons.Default.DeleteOutline,"حذف")} } }
+   ElevatedCard(onClick={openNote=n.id},modifier=Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)) {Text(n.parts.firstOrNull()?.title?.ifBlank{"بدون عنوان"}?:"بدون عنوان",style=MaterialTheme.typography.titleMedium);Text("${n.parts.size} بخش",color=Color.Gray);if(n.parts.any{it.alarm>0})Text("⏰ دارای یادآور",color=blue) }; IconButton(onClick={deletingNote=n.id}){Icon(Icons.Default.DeleteOutline,"حذف")} } }
   } }
  }
- else -> { Text("مدیریت حساب‌ها",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(12.dp))
-  LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)) { items(accounts,key={it.id}){a->ElevatedCard(onClick={openAccount=a.id},modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(a.title,style=MaterialTheme.typography.titleMedium);Text("مانده: "+money(a.entries.sumOf{it.amount}));Text("${a.entries.size} تراکنش",color=Color.Gray)};IconButton(onClick={accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts)}){Icon(Icons.Default.DeleteOutline,"حذف")} }} } }
+ tab==1 -> { Text("مدیریت حساب‌ها",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(12.dp))
+  LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)) { items(accounts,key={it.id}){a->ElevatedCard(onClick={openAccount=a.id},modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(a.title,style=MaterialTheme.typography.titleMedium);Text("مانده: "+money(a.entries.sumOf{it.amount}));Text("${a.entries.size} تراکنش",color=Color.Gray)};IconButton(onClick={deletingAccount=a.id}){Icon(Icons.Default.DeleteOutline,"حذف")} }} } }
+ }
+ else -> {
+  Text("تنظیمات",style=MaterialTheme.typography.titleLarge)
+  Spacer(Modifier.height(20.dp))
+  ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   Text("صدای یادآوری",style=MaterialTheme.typography.titleMedium)
+   Text(if(sound.isBlank())"صدای پیش‌فرض اعلان‌ها" else "صدای انتخاب‌شده",color=Color.Gray)
+   OutlinedButton(onClick={
+    val intent=Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply{
+     putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE,RingtoneManager.TYPE_NOTIFICATION)
+     putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,true)
+     putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,false)
+     putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)else Uri.parse(sound))
+    }
+    ringtoneLauncher.launch(intent)
+   }){Icon(Icons.Default.Notifications,null);Text(" انتخاب صدای یادآوری")}
+  }}
+  Spacer(Modifier.height(16.dp))
+  ElevatedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+   Text("انتقال و نگهداری اطلاعات",style=MaterialTheme.typography.titleMedium)
+   Text("بکاپ شامل همه یادداشت‌ها، حساب‌ها و تنظیمات است.",color=Color.Gray)
+   Button(onClick={backupLauncher.launch("AniNote-backup.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.SaveAlt,null);Text(" تهیه بکاپ")}
+   OutlinedButton(onClick={importLauncher.launch(arrayOf("application/json","text/plain","application/octet-stream"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,null);Text(" بازیابی از فایل بکاپ")}
+  }}
  }
  } } }
+ if(deletingNote!=null) DeleteDialog({val id=deletingNote!!;notes.removeAll{it.id==id};repo.saveNotes(notes);deletingNote=null},{deletingNote=null})
+ if(deletingAccount!=null) DeleteDialog({val id=deletingAccount!!;accounts.removeAll{it.id==id};repo.saveAccounts(accounts);deletingAccount=null},{deletingAccount=null})
+ if(importedBackup!=null) AlertDialog(onDismissRequest={importedBackup=null},title={Text("تأیید بازیابی بکاپ")},text={Text("اطلاعات فعلی با اطلاعات فایل بکاپ جایگزین می‌شوند. قبل از ادامه از اطلاعات فعلی نسخه پشتیبان تهیه کنید.")},confirmButton={TextButton(onClick={
+  try{BackupCodec.restore(repo,importedBackup!!);notes.clear();notes.addAll(repo.notes());accounts.clear();accounts.addAll(repo.accounts());sound=repo.p.getString("sound_uri","")?:"";NotificationSounds.channel(context,sound);importedBackup=null;android.widget.Toast.makeText(context,"بازیابی انجام شد",0).show()}catch(e:Exception){importedBackup=null;android.widget.Toast.makeText(context,"خطا در بازیابی",1).show()}
+ }){Text("بازیابی")}},dismissButton={TextButton(onClick={importedBackup=null}){Text("انصراف")}})
  if(newAccount) AlertDialog(onDismissRequest={newAccount=false},title={Text("ایجاد حساب")},text={OutlinedTextField(accountName,{accountName=it},label={Text("عنوان حساب")})},confirmButton={TextButton(onClick={if(accountName.isNotBlank()){val a=Account(title=accountName.trim());accounts.add(a);repo.saveAccounts(accounts);openAccount=a.id;newAccount=false}}){Text("ایجاد")}},dismissButton={TextButton(onClick={newAccount=false}){Text("انصراف")}})
  } }
 }
-@Composable fun NoteEditor(n:Note,update:(Note)->Unit,delete:()->Unit) {
+@Composable fun NoteEditor(n:Note,update:(Note)->Unit,delete:()->Unit,export:()->Unit) {
  val context=LocalContext.current
  var askDelete by remember { mutableStateOf(false) }
- Row(verticalAlignment=Alignment.CenterVertically){ Text("ذخیره خودکار فعال است",modifier=Modifier.weight(1f),color=blue);TextButton(onClick={askDelete=true}){Text("حذف یادداشت")} }
+ Row(verticalAlignment=Alignment.CenterVertically){ Text("ذخیره خودکار فعال است",modifier=Modifier.weight(1f),color=blue);TextButton(onClick=export){Text("گزارش PDF")};TextButton(onClick={askDelete=true}){Text("حذف یادداشت")} }
  LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)) {
  items(n.parts,key={it.id}){ part ->
   var datePicker by remember { mutableStateOf(false) }
@@ -118,9 +175,9 @@ class MainActivity:ComponentActivity() {
  }
  if(askDelete) DeleteDialog({delete();askDelete=false},{askDelete=false})
 }
-@Composable fun AccountEditor(a:Account,update:(Account)->Unit,delete:()->Unit) {
+@Composable fun AccountEditor(a:Account,update:(Account)->Unit,delete:()->Unit,export:()->Unit) {
  var add by remember { mutableStateOf(false) };var editing by remember { mutableStateOf<Entry?>(null) };var rename by remember { mutableStateOf(false) };var name by remember(a.id){ mutableStateOf(a.title) };var askDelete by remember { mutableStateOf(false) }
- Row(verticalAlignment=Alignment.CenterVertically){Text(a.title,style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));IconButton(onClick={rename=true}){Icon(Icons.Default.Edit,"ویرایش عنوان")};IconButton(onClick={askDelete=true}){Icon(Icons.Default.DeleteOutline,"حذف حساب")}}
+ Row(verticalAlignment=Alignment.CenterVertically){Text(a.title,style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));IconButton(onClick=export){Icon(Icons.Default.PictureAsPdf,"گزارش PDF")};IconButton(onClick={rename=true}){Icon(Icons.Default.Edit,"ویرایش عنوان")};IconButton(onClick={askDelete=true}){Icon(Icons.Default.DeleteOutline,"حذف حساب")}}
  Card(colors=CardDefaults.cardColors(containerColor=blue)){Column(Modifier.fillMaxWidth().padding(20.dp)){Text("مانده حساب",color=Color.White);Text(money(a.entries.sumOf{it.amount}),color=Color.White,style=MaterialTheme.typography.titleLarge)}}
  Spacer(Modifier.height(12.dp))
  Button(onClick={editing=null;add=true},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text(" ثبت گردش جدید")}
