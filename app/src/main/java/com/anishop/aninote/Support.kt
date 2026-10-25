@@ -25,6 +25,9 @@ object BackupCodec {
   .put("notes",JSONArray(repo.p.getString("notes","[]")))
   .put("accounts",JSONArray(repo.p.getString("accounts","[]")))
   .put("sound",repo.p.getString("sound_uri",""))
+  .put("ring_duration",repo.p.getInt("ring_duration",20))
+  .put("ring_repeat",repo.p.getBoolean("ring_repeat",false))
+  .put("repeat_minutes",repo.p.getInt("repeat_minutes",2))
   .toString(2)
  fun validate(text:String):JSONObject {
   val json=JSONObject(text)
@@ -52,13 +55,18 @@ object BackupCodec {
     e.getString("id");e.getString("subject");e.getLong("amount");e.getLong("date")
    }
   }
+  require(json.optInt("ring_duration",20) in 1..300)
+  require(json.optInt("repeat_minutes",2) in 1..1440)
   return json
  }
  fun restore(repo:Repo,text:String){
   val j=validate(text)
   val ok=repo.p.edit().putString("notes",j.getJSONArray("notes").toString())
    .putString("accounts",j.getJSONArray("accounts").toString())
-   .putString("sound_uri",j.optString("sound","")).commit()
+   .putString("sound_uri",j.optString("sound",""))
+   .putInt("ring_duration",j.optInt("ring_duration",20))
+   .putBoolean("ring_repeat",j.optBoolean("ring_repeat",false))
+   .putInt("repeat_minutes",j.optInt("repeat_minutes",2)).commit()
   check(ok){"Failed to write backup"}
   Alarms.sync(repo.context,repo.notes())
  }
@@ -68,7 +76,7 @@ object NotificationSounds {
  fun channel(context:Context,sound:String):String {
   val id=channelId(sound)
   val manager=context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-  val uri=if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) else Uri.parse(sound)
+  val uri=if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) else Uri.parse(sound)
   val attributes=AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
   val channel=NotificationChannel(id,"یادآورهای Ani Note",NotificationManager.IMPORTANCE_HIGH)
