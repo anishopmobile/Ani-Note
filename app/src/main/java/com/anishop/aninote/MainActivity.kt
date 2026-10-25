@@ -69,6 +69,9 @@ class MainActivity:ComponentActivity() {
  var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
  var importedBackup by remember { mutableStateOf<String?>(null) }
  var sound by remember { mutableStateOf(repo.p.getString("sound_uri","") ?: "") }
+ var duration by remember { mutableStateOf(repo.p.getInt("ring_duration",20).toString()) }
+ var repeatEnabled by remember { mutableStateOf(repo.p.getBoolean("ring_repeat",false)) }
+ var repeatMinutes by remember { mutableStateOf(repo.p.getInt("repeat_minutes",2).toString()) }
  val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
   if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",0).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",1).show()}
  }
@@ -120,17 +123,34 @@ class MainActivity:ComponentActivity() {
   Text("تنظیمات",style=MaterialTheme.typography.titleLarge)
   Spacer(Modifier.height(20.dp))
   ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-   Text("صدای یادآوری",style=MaterialTheme.typography.titleMedium)
+   Text("آهنگ زنگ یادآوری",style=MaterialTheme.typography.titleMedium)
    Text(if(sound.isBlank())"صدای پیش‌فرض اعلان‌ها" else "صدای انتخاب‌شده",color=Color.Gray)
    OutlinedButton(onClick={
     val intent=Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply{
-     putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE,RingtoneManager.TYPE_NOTIFICATION)
+     putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE,RingtoneManager.TYPE_RINGTONE)
      putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,true)
      putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,false)
-     putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)else Uri.parse(sound))
+     putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)else Uri.parse(sound))
     }
     ringtoneLauncher.launch(intent)
-   }){Icon(Icons.Default.Notifications,null);Text(" انتخاب صدای یادآوری")}
+   }){Icon(Icons.Default.Notifications,null);Text(" انتخاب آهنگ زنگ تماس")}
+  }}
+  Spacer(Modifier.height(12.dp))
+  ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   Text("تنظیمات پخش زنگ",style=MaterialTheme.typography.titleMedium)
+   OutlinedTextField(duration,{v->
+    duration=v.filter{it.isDigit()}.take(3)
+    duration.toIntOrNull()?.takeIf{it in 1..300}?.let{repo.p.edit().putInt("ring_duration",it).apply()}
+   },label={Text("مدت پخش (ثانیه، ۱ تا ۳۰۰)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.fillMaxWidth())
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Text("تکرار تا زمان توقف",modifier=Modifier.weight(1f))
+    Switch(checked=repeatEnabled,onCheckedChange={repeatEnabled=it;repo.p.edit().putBoolean("ring_repeat",it).apply()})
+   }
+   if(repeatEnabled)OutLinedRepeatInput(repeatMinutes){value->
+    repeatMinutes=value.filter{it.isDigit()}.take(4)
+    repeatMinutes.toIntOrNull()?.takeIf{it in 1..1440}?.let{repo.p.edit().putInt("repeat_minutes",it).apply()}
+   }
+   Text("توقف زنگ از دکمه «توقف یادآوری» در اعلان گوشی انجام می‌شود.",color=Color.Gray)
   }}
   Spacer(Modifier.height(16.dp))
   ElevatedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -277,3 +297,7 @@ internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
  )
 }
 @Composable fun DeleteDialog(confirm:()->Unit,dismiss:()->Unit){AlertDialog(onDismissRequest=dismiss,title={Text("حذف اطلاعات")},text={Text("آیا از حذف مطمئن هستید؟")},confirmButton={TextButton(onClick=confirm){Text("حذف")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})}
+
+@Composable private fun OutLinedRepeatInput(value:String,change:(String)->Unit){
+ OutlinedTextField(value,change,label={Text("فاصله تکرار (دقیقه، ۱ تا ۱۴۴۰)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.fillMaxWidth())
+}
