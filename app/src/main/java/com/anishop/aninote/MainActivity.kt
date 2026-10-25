@@ -72,7 +72,7 @@ class MainActivity:ComponentActivity() {
   if(openNote!=null || openAccount!=null) IconButton(onClick={openNote=null;openAccount=null}){ Icon(Icons.Default.ArrowForward,"بازگشت") }
   Column(Modifier.weight(1f)) { Text("Ani Note",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
- } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(tab==0,{tab=0},{Icon(Icons.Default.Description,null)},{Text("یادداشت‌ها")}); NavigationBarItem(tab==1,{tab=1},{Icon(Icons.Default.AccountBalanceWallet,null)},{Text("مدیریت حساب")}) } },
+ } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}) } },
  floatingActionButton={ if(openNote==null && openAccount==null) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
  ) { padding -> Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
  when {
