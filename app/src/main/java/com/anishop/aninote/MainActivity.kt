@@ -140,15 +140,78 @@ class MainActivity:ComponentActivity() {
  if(picker)PersianPicker(date,{picker=false}){date=it;picker=false}
 }
 @Composable fun PersianPicker(initial:Long,dismiss:()->Unit,selected:(Long)->Unit) {
- val c=remember(initial){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial}}
- var y by remember{mutableIntStateOf(c.get(1))};var m by remember{mutableIntStateOf(c.get(2))};var d by remember{mutableIntStateOf(c.get(5))}
- val names=listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
- fun move(n:Int){val t=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{clear();set(1,y);set(2,m);set(5,1);add(2,n)};y=t.get(1);m=t.get(2);d=1}
- val max=remember(y,m){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{clear();set(1,y);set(2,m);set(5,1)}.getActualMaximum(5)}
- AlertDialog(onDismissRequest=dismiss,title={Text("انتخاب تاریخ شمسی")},text={Column{
-  Row(verticalAlignment=Alignment.CenterVertically){IconButton(onClick={move(-1)}){Icon(Icons.Default.ChevronRight,null)};Text(names[m]+" "+y,modifier=Modifier.weight(1f));IconButton(onClick={move(1)}){Icon(Icons.Default.ChevronLeft,null)}}
-  Row {TextButton(onClick={y--;d=1}){Text("سال قبل")};TextButton(onClick={y++;d=1}){Text("سال بعد")}}
-  (1..max).toList().chunked(7).forEach{week->Row(Modifier.fillMaxWidth()){week.forEach{day->Box(Modifier.weight(1f)){TextButton(onClick={d=day},colors=ButtonDefaults.textButtonColors(contentColor=if(d==day)Color.Red else blue)){Text("$day")}}};repeat(7-week.size){Spacer(Modifier.weight(1f))}}}
- }},confirmButton={TextButton(onClick={val t=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial;set(1,y);set(2,m);set(5,d)};selected(t.timeInMillis)}){Text("تأیید")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
+ val cal=remember(initial){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial}}
+ var year by remember(initial){mutableIntStateOf(cal.get(android.icu.util.Calendar.YEAR))}
+ var month by remember(initial){mutableIntStateOf(cal.get(android.icu.util.Calendar.MONTH))}
+ var day by remember(initial){mutableIntStateOf(cal.get(android.icu.util.Calendar.DAY_OF_MONTH))}
+ val months=listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
+ val weekdays=listOf("ش","ی","د","س","چ","پ","ج")
+ fun monthCal()=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{
+  clear();set(android.icu.util.Calendar.YEAR,year);set(android.icu.util.Calendar.MONTH,month);set(android.icu.util.Calendar.DAY_OF_MONTH,1)
+ }
+ fun move(delta:Int){
+  val c=monthCal().apply{add(android.icu.util.Calendar.MONTH,delta)}
+  year=c.get(android.icu.util.Calendar.YEAR);month=c.get(android.icu.util.Calendar.MONTH);day=1
+ }
+ val first=remember(year,month){monthCal()}
+ val count=remember(year,month){first.getActualMaximum(android.icu.util.Calendar.DAY_OF_MONTH)}
+ // Android Calendar: Sunday=1 ... Saturday=7; Saturday is the first Persian weekday.
+ val offset=remember(year,month){first.get(android.icu.util.Calendar.DAY_OF_WEEK)%7}
+ val rows=(offset+count+6)/7
+ AlertDialog(
+  onDismissRequest=dismiss,
+  shape=RoundedCornerShape(24.dp),
+  title={Text("انتخاب تاریخ شمسی",style=MaterialTheme.typography.titleMedium)},
+  text={Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+    IconButton(onClick={move(-1)}){Icon(Icons.Default.ChevronRight,"ماه قبل")}
+    Text(months[month]+" "+year,Modifier.weight(1f),textAlign=androidx.compose.ui.text.style.TextAlign.Center,style=MaterialTheme.typography.titleMedium)
+    IconButton(onClick={move(1)}){Icon(Icons.Default.ChevronLeft,"ماه بعد")}
+   }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+    TextButton(onClick={year--;day=1}){Text("سال قبل")}
+    TextButton(onClick={year++;day=1}){Text("سال بعد")}
+   }
+   Row(Modifier.fillMaxWidth()){
+    weekdays.forEach{label->
+     Box(Modifier.weight(1f).height(32.dp),contentAlignment=Alignment.Center){
+      Text(label,color=Color.Gray,style=MaterialTheme.typography.labelMedium,maxLines=1,softWrap=false)
+     }
+    }
+   }
+   repeat(rows){week->
+    Row(Modifier.fillMaxWidth()){
+     repeat(7){weekday->
+      val num=week*7+weekday-offset+1
+      Box(Modifier.weight(1f).height(42.dp).padding(1.dp),contentAlignment=Alignment.Center){
+       if(num in 1..count){
+        val chosen=day==num
+        Box(
+         Modifier.size(38.dp).background(if(chosen)blue else Color.Transparent,RoundedCornerShape(50))
+          .clickable{day=num},
+         contentAlignment=Alignment.Center
+        ){
+         Text(num.toString(),color=if(chosen)Color.White else MaterialTheme.colorScheme.onSurface,
+          style=MaterialTheme.typography.bodyMedium,maxLines=1,softWrap=false,
+          textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+        }
+       }
+      }
+     }
+    }
+   }
+  }},
+  confirmButton={TextButton(onClick={
+   val result=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{
+    timeInMillis=initial
+    set(android.icu.util.Calendar.DAY_OF_MONTH,1)
+    set(android.icu.util.Calendar.YEAR,year)
+    set(android.icu.util.Calendar.MONTH,month)
+    set(android.icu.util.Calendar.DAY_OF_MONTH,day)
+   }
+   selected(result.timeInMillis)
+  }){Text("تأیید")}},
+  dismissButton={TextButton(onClick=dismiss){Text("انصراف")}}
+ )
 }
 @Composable fun DeleteDialog(confirm:()->Unit,dismiss:()->Unit){AlertDialog(onDismissRequest=dismiss,title={Text("حذف اطلاعات")},text={Text("آیا از حذف مطمئن هستید؟")},confirmButton={TextButton(onClick=confirm){Text("حذف")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})}
