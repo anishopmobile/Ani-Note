@@ -5,7 +5,7 @@ import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
 import android.os.*
-import android.icu.util.PersianCalendar
+import android.icu.util.Calendar as PersianCalendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,8 +36,8 @@ data class Part(val id:String=UUID.randomUUID().toString(), val title:String="",
 data class Note(val id:String=UUID.randomUUID().toString(), val parts:List<Part> = listOf(Part()))
 data class Entry(val id:String=UUID.randomUUID().toString(), val subject:String="", val amount:Long=0, val date:Long=System.currentTimeMillis())
 data class Account(val id:String=UUID.randomUUID().toString(), val title:String="", val entries:List<Entry> = emptyList())
-fun jalali(m:Long):String { val c=PersianCalendar().apply { timeInMillis=m }; return "%04d/%02d/%02d".format(Locale.US,c.get(1),c.get(2)+1,c.get(5)) }
-fun clock(m:Long):String { val c=PersianCalendar().apply { timeInMillis=m }; return "%02d:%02d".format(Locale.US,c.get(11),c.get(12)) }
+fun jalali(m:Long):String { val c=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply { timeInMillis=m }; return "%04d/%02d/%02d".format(Locale.US,c.get(1),c.get(2)+1,c.get(5)) }
+fun clock(m:Long):String { val c=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply { timeInMillis=m }; return "%02d:%02d".format(Locale.US,c.get(11),c.get(12)) }
 fun money(m:Long)=String.format(Locale.US,"%,d",m)+" تومان"
 val blue=Color(0xFF4654C8)
 class Repo(val context:Context) {
@@ -93,6 +93,7 @@ class MainActivity:ComponentActivity() {
  } }
 }
 @Composable fun NoteEditor(n:Note,update:(Note)->Unit,delete:()->Unit) {
+ val context=LocalContext.current
  var askDelete by remember { mutableStateOf(false) }
  Row(verticalAlignment=Alignment.CenterVertically){ Text("ذخیره خودکار فعال است",modifier=Modifier.weight(1f),color=blue);TextButton(onClick={askDelete=true}){Text("حذف یادداشت")} }
  LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -109,8 +110,8 @@ class MainActivity:ComponentActivity() {
   }}
   if(datePicker) PersianPicker(if(part.alarm>0)part.alarm else System.currentTimeMillis(),{datePicker=false}){date->
    datePicker=false
-   val cal=PersianCalendar().apply{timeInMillis=date}
-   TimePickerDialog(androidx.compose.ui.platform.LocalContext.current,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it}))},9,0,true).show()
+   val cal=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=date}
+   TimePickerDialog(context,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it}))},9,0,true).show()
   }
  }
  item { OutlinedButton(onClick={update(n.copy(parts=n.parts+Part()))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PostAdd,null);Text(" Page Break • بخش جدید")} }
@@ -139,15 +140,15 @@ class MainActivity:ComponentActivity() {
  if(picker)PersianPicker(date,{picker=false}){date=it;picker=false}
 }
 @Composable fun PersianPicker(initial:Long,dismiss:()->Unit,selected:(Long)->Unit) {
- val c=remember(initial){PersianCalendar().apply{timeInMillis=initial}}
+ val c=remember(initial){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial}}
  var y by remember{mutableIntStateOf(c.get(1))};var m by remember{mutableIntStateOf(c.get(2))};var d by remember{mutableIntStateOf(c.get(5))}
  val names=listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
- fun move(n:Int){val t=PersianCalendar().apply{clear();set(1,y);set(2,m);set(5,1);add(2,n)};y=t.get(1);m=t.get(2);d=1}
- val max=remember(y,m){PersianCalendar().apply{clear();set(1,y);set(2,m);set(5,1)}.getActualMaximum(5)}
+ fun move(n:Int){val t=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{clear();set(1,y);set(2,m);set(5,1);add(2,n)};y=t.get(1);m=t.get(2);d=1}
+ val max=remember(y,m){PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{clear();set(1,y);set(2,m);set(5,1)}.getActualMaximum(5)}
  AlertDialog(onDismissRequest=dismiss,title={Text("انتخاب تاریخ شمسی")},text={Column{
   Row(verticalAlignment=Alignment.CenterVertically){IconButton(onClick={move(-1)}){Icon(Icons.Default.ChevronRight,null)};Text(names[m]+" "+y,modifier=Modifier.weight(1f));IconButton(onClick={move(1)}){Icon(Icons.Default.ChevronLeft,null)}}
   Row {TextButton(onClick={y--;d=1}){Text("سال قبل")};TextButton(onClick={y++;d=1}){Text("سال بعد")}}
   (1..max).toList().chunked(7).forEach{week->Row(Modifier.fillMaxWidth()){week.forEach{day->Box(Modifier.weight(1f)){TextButton(onClick={d=day},colors=ButtonDefaults.textButtonColors(contentColor=if(d==day)Color.Red else blue)){Text("$day")}}};repeat(7-week.size){Spacer(Modifier.weight(1f))}}}
- }},confirmButton={TextButton(onClick={val t=PersianCalendar().apply{timeInMillis=initial;set(1,y);set(2,m);set(5,d)};selected(t.timeInMillis)}){Text("تأیید")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
+ }},confirmButton={TextButton(onClick={val t=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=initial;set(1,y);set(2,m);set(5,d)};selected(t.timeInMillis)}){Text("تأیید")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
 }
 @Composable fun DeleteDialog(confirm:()->Unit,dismiss:()->Unit){AlertDialog(onDismissRequest=dismiss,title={Text("حذف اطلاعات")},text={Text("آیا از حذف مطمئن هستید؟")},confirmButton={TextButton(onClick=confirm){Text("حذف")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})}
