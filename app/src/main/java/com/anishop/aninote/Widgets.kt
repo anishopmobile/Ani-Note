@@ -45,7 +45,21 @@ abstract class AniWidget:AppWidgetProvider(){
       if(!reveal)selected.size.toString()+" حساب انتخاب شده"
       else selected.take(3).joinToString("\n"){it.title+": "+money(it.entries.sumOf{e->e.amount})}
      }
-     else->jalali(System.currentTimeMillis())
+     else->{
+      val now=persianCal()
+      val y=now.get(android.icu.util.Calendar.YEAR)
+      val month=now.get(android.icu.util.Calendar.MONTH)
+      val first=persianCal().apply{clear();set(android.icu.util.Calendar.YEAR,y);set(android.icu.util.Calendar.MONTH,month);set(android.icu.util.Calendar.DAY_OF_MONTH,1)}
+      val offset=first.get(android.icu.util.Calendar.DAY_OF_WEEK)%7
+      val days=first.getActualMaximum(android.icu.util.Calendar.DAY_OF_MONTH)
+      val lines=(0 until calendarRows(offset,days)).joinToString("\n"){row->
+       (0..6).joinToString(" "){col->
+        val d=row*7+col-offset+1
+        if(d in 1..days) d.toString().padStart(2,' ') else "  "
+       }
+      }
+      jalali(System.currentTimeMillis())+"\nش ی د س چ پ ج\n"+lines
+     }
     }
    }catch(e:Exception){"برای نمایش اطلاعات، برنامه را باز کنید"}
    val label=when(type){"note"->"یادداشت‌ها";"account"->"حساب‌ها";else->"تقویم شمسی"}
