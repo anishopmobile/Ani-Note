@@ -103,6 +103,9 @@ class MainActivity:FragmentActivity() {
  var showCalendarHolidays by remember {mutableStateOf(repo.p.getBoolean("calendar_holidays",true))}
  var showCalendarFridays by remember {mutableStateOf(repo.p.getBoolean("calendar_fridays",true))}
  var revealWidgets by remember {mutableStateOf(context.getSharedPreferences("widget_prefs",0).getBoolean("reveal",false))}
+ var widgetNoteIds by remember { mutableStateOf(context.getSharedPreferences("widget_prefs",0).getStringSet("notes",emptySet()).orEmpty().toSet()) }
+ var widgetAccountIds by remember { mutableStateOf(context.getSharedPreferences("widget_prefs",0).getStringSet("accounts",emptySet()).orEmpty().toSet()) }
+
  var iconSelected by remember {mutableStateOf<Uri?>(null)}
  val shortcutPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->iconSelected=uri}
 
@@ -228,24 +231,24 @@ class MainActivity:FragmentActivity() {
    Text("یادداشت‌های ویجت",style=MaterialTheme.typography.titleSmall)
    notes.forEach{note->
     val prefs=context.getSharedPreferences("widget_prefs",0)
-    val ids=prefs.getStringSet("notes",emptySet()).orEmpty()
+    val ids=widgetNoteIds
     Row(verticalAlignment=Alignment.CenterVertically){
      Text(note.parts.firstOrNull()?.title?.ifBlank{"بدون عنوان"}?:"بدون عنوان",Modifier.weight(1f),maxLines=1)
      Checkbox(ids.contains(note.id),{checked->
       val next=ids.toMutableSet();if(checked)next.add(note.id) else next.remove(note.id)
-      prefs.edit().putStringSet("notes",next).apply();AniWidget.refresh(context)
+      widgetNoteIds=next; prefs.edit().putStringSet("notes",next).apply();AniWidget.refresh(context)
      })
     }
    }
    Text("حساب‌های ویجت",style=MaterialTheme.typography.titleSmall)
    accounts.forEach{account->
     val prefs=context.getSharedPreferences("widget_prefs",0)
-    val ids=prefs.getStringSet("accounts",emptySet()).orEmpty()
+    val ids=widgetAccountIds
     Row(verticalAlignment=Alignment.CenterVertically){
      Text(account.title,Modifier.weight(1f),maxLines=1)
      Checkbox(ids.contains(account.id),{checked->
       val next=ids.toMutableSet();if(checked)next.add(account.id) else next.remove(account.id)
-      prefs.edit().putStringSet("accounts",next).apply();AniWidget.refresh(context)
+      widgetAccountIds=next; prefs.edit().putStringSet("accounts",next).apply();AniWidget.refresh(context)
      })
     }
    }
