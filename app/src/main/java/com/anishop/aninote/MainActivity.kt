@@ -99,6 +99,13 @@ class MainActivity:FragmentActivity() {
  var duration by remember { mutableStateOf(repo.p.getInt("ring_duration",20).toString()) }
  var repeatEnabled by remember { mutableStateOf(repo.p.getBoolean("ring_repeat",false)) }
  var repeatMinutes by remember { mutableStateOf(repo.p.getInt("repeat_minutes",2).toString()) }
+ var showCalendarEvents by remember {mutableStateOf(repo.p.getBoolean("calendar_events",true))}
+ var showCalendarHolidays by remember {mutableStateOf(repo.p.getBoolean("calendar_holidays",true))}
+ var showCalendarFridays by remember {mutableStateOf(repo.p.getBoolean("calendar_fridays",true))}
+ var revealWidgets by remember {mutableStateOf(context.getSharedPreferences("widget_prefs",0).getBoolean("reveal",false))}
+ var iconSelected by remember {mutableStateOf<Uri?>(null)}
+ val shortcutPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->iconSelected=uri}
+
  val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
   if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",0).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",1).show()}
  }
@@ -142,9 +149,9 @@ class MainActivity:FragmentActivity() {
   if(openNote!=null || openAccount!=null) IconButton(onClick={openNote=null;openAccount=null}){ Icon(Icons.Default.ArrowForward,"بازگشت") }
   Column(Modifier.weight(1f)) { Text("Ani Note",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
- } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
- floatingActionButton={ if(openNote==null && openAccount==null && tab!=2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
- ) { padding -> Column(Modifier.fillMaxSize().padding(padding).then(if(tab==2 && openNote==null && openAccount==null) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp)) {
+ } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.CalendarMonth,null)},label={Text("تقویم")});NavigationBarItem(selected=tab==3,onClick={tab=3},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
+ floatingActionButton={ if(openNote==null && openAccount==null && tab<2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
+ ) { padding -> Column(Modifier.fillMaxSize().padding(padding).then(if(tab>=2 && openNote==null && openAccount==null) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp)) {
  when {
  openNote!=null -> { val n=notes.firstOrNull{it.id==openNote}; if(n!=null) NoteEditor(n,::changeNote,{notes.removeAll{it.id==n.id};repo.saveNotes(notes);openNote=null},{exportPdf(n.parts.firstOrNull()?.title ?: "یادداشت",n.parts.flatMapIndexed{index,p->listOf("بخش "+(index+1)+" — "+p.title,p.body)+ (if(p.alarm>0)listOf("یادآوری: "+jalali(p.alarm)+" "+clock(p.alarm))else emptyList())})}) }
  openAccount!=null -> { val a=accounts.firstOrNull{it.id==openAccount}; if(a!=null) AccountEditor(a,::changeAccount,{accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts);openAccount=null},{exportPdf(a.title,listOf("مانده حساب: "+money(a.entries.sumOf{it.amount})) + a.entries.map{it.subject+" | "+money(it.amount)+" | "+jalali(it.date)})}) }
@@ -158,6 +165,7 @@ class MainActivity:FragmentActivity() {
  tab==1 -> { Text("مدیریت حساب‌ها",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(12.dp))
   LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)) { items(accounts,key={it.id}){a->ElevatedCard(onClick={openAccount=a.id},modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(a.title,style=MaterialTheme.typography.titleMedium);Text("مانده: "+money(a.entries.sumOf{it.amount}));Text("${a.entries.size} تراکنش",color=Color.Gray)};IconButton(onClick={deletingAccount=a.id}){Icon(Icons.Default.DeleteOutline,"حذف")} }} } }
  }
+ tab==2 -> CalendarPage(showCalendarHolidays,showCalendarEvents,showCalendarFridays)
  else -> {
   Text("تنظیمات",style=MaterialTheme.typography.titleLarge)
   Spacer(Modifier.height(20.dp))
@@ -192,6 +200,57 @@ class MainActivity:FragmentActivity() {
    Text("توقف زنگ از دکمه «توقف یادآوری» در اعلان گوشی انجام می‌شود.",color=Color.Gray)
   }}
   Spacer(Modifier.height(16.dp))
+  ElevatedCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("تغییر آیکن برنامه",style=MaterialTheme.typography.titleMedium)
+   Text("اندروید اجازه تعویض مستقیم آیکن اصلی با عکس گالری را نمی‌دهد؛ می‌توانید با عکس انتخابی میانبر جدیدی روی صفحه اصلی بسازید.")
+   OutlinedButton(onClick={shortcutPicker.launch("image/*")}){Text("انتخاب عکس از گالری")}
+   if(iconSelected!=null)Button(onClick={
+    val ok=try{CustomShortcut.pin(context,iconSelected!!)}catch(e:Exception){false}
+    android.widget.Toast.makeText(context,if(ok)"درخواست افزودن میانبر به صفحه اصلی ارسال شد" else "لانچر گوشی از میانبر شخصی پشتیبانی نمی‌کند",1).show()
+   }){Text("ذخیره و ساخت میانبر آیکن")}
+  }}
+  Spacer(Modifier.height(14.dp))
+  ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("تنظیمات تقویم",style=MaterialTheme.typography.titleMedium)
+   Row(verticalAlignment=Alignment.CenterVertically){Text("مناسبت‌های ثبت‌شده",Modifier.weight(1f));Switch(showCalendarEvents,{showCalendarEvents=it;repo.p.edit().putBoolean("calendar_events",it).apply()})}
+   Row(verticalAlignment=Alignment.CenterVertically){Text("تعطیلات رسمی ثابت",Modifier.weight(1f));Switch(showCalendarHolidays,{showCalendarHolidays=it;repo.p.edit().putBoolean("calendar_holidays",it).apply()})}
+   Row(verticalAlignment=Alignment.CenterVertically){Text("برجسته‌سازی جمعه‌ها",Modifier.weight(1f));Switch(showCalendarFridays,{showCalendarFridays=it;repo.p.edit().putBoolean("calendar_fridays",it).apply()})}
+  }}
+  Spacer(Modifier.height(14.dp))
+  ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("ویجت‌های صفحه اصلی",style=MaterialTheme.typography.titleMedium)
+   Text("برای افزودن ویجت از فهرست ویجت‌های لانچر گوشی، Ani Note را انتخاب کنید.")
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Text("نمایش محتوای خصوصی در ویجت",Modifier.weight(1f))
+    Switch(revealWidgets,{revealWidgets=it;context.getSharedPreferences("widget_prefs",0).edit().putBoolean("reveal",it).apply();AniWidget.refresh(context)})
+   }
+   Text("نمایش نام و مبلغ روی صفحه اصلی گوشی ممکن است حتی در زمان قفل بودن برنامه قابل مشاهده باشد.",color=Color.Gray)
+   Text("یادداشت‌های ویجت",style=MaterialTheme.typography.titleSmall)
+   notes.forEach{note->
+    val prefs=context.getSharedPreferences("widget_prefs",0)
+    val ids=prefs.getStringSet("notes",emptySet()).orEmpty()
+    Row(verticalAlignment=Alignment.CenterVertically){
+     Text(note.parts.firstOrNull()?.title?.ifBlank{"بدون عنوان"}?:"بدون عنوان",Modifier.weight(1f),maxLines=1)
+     Checkbox(ids.contains(note.id),{checked->
+      val next=ids.toMutableSet();if(checked)next.add(note.id) else next.remove(note.id)
+      prefs.edit().putStringSet("notes",next).apply();AniWidget.refresh(context)
+     })
+    }
+   }
+   Text("حساب‌های ویجت",style=MaterialTheme.typography.titleSmall)
+   accounts.forEach{account->
+    val prefs=context.getSharedPreferences("widget_prefs",0)
+    val ids=prefs.getStringSet("accounts",emptySet()).orEmpty()
+    Row(verticalAlignment=Alignment.CenterVertically){
+     Text(account.title,Modifier.weight(1f),maxLines=1)
+     Checkbox(ids.contains(account.id),{checked->
+      val next=ids.toMutableSet();if(checked)next.add(account.id) else next.remove(account.id)
+      prefs.edit().putStringSet("accounts",next).apply();AniWidget.refresh(context)
+     })
+    }
+   }
+  }}
+  Spacer(Modifier.height(14.dp))
   SecureSettings(access,onLock)
   Spacer(Modifier.height(16.dp))
   ElevatedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
