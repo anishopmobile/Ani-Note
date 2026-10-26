@@ -22,8 +22,8 @@ object BackupCodec {
   .put("format","ani-note-backup")
   .put("version",1)
   .put("created",System.currentTimeMillis())
-  .put("notes",JSONArray(repo.p.getString("notes","[]")))
-  .put("accounts",JSONArray(repo.p.getString("accounts","[]")))
+  .put("notes",JSONArray(repo.encrypted.read("notes")))
+  .put("accounts",JSONArray(repo.encrypted.read("accounts")))
   .put("sound",repo.p.getString("sound_uri",""))
   .put("ring_duration",repo.p.getInt("ring_duration",20))
   .put("ring_repeat",repo.p.getBoolean("ring_repeat",false))
@@ -61,9 +61,9 @@ object BackupCodec {
  }
  fun restore(repo:Repo,text:String){
   val j=validate(text)
-  val ok=repo.p.edit().putString("notes",j.getJSONArray("notes").toString())
-   .putString("accounts",j.getJSONArray("accounts").toString())
-   .putString("sound_uri",j.optString("sound",""))
+  repo.encrypted.write("notes",j.getJSONArray("notes").toString())
+  repo.encrypted.write("accounts",j.getJSONArray("accounts").toString())
+  val ok=repo.p.edit().putString("sound_uri",j.optString("sound",""))
    .putInt("ring_duration",j.optInt("ring_duration",20))
    .putBoolean("ring_repeat",j.optBoolean("ring_repeat",false))
    .putInt("repeat_minutes",j.optInt("repeat_minutes",2)).commit()
