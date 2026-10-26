@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.os.*
 import android.media.RingtoneManager
 import android.net.Uri
+import androidx.fragment.app.FragmentActivity
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager
 import android.icu.util.Calendar as PersianCalendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -55,10 +58,31 @@ class Repo(val context:Context) {
  } } catch(_:Exception) { emptyList() }
  fun saveAccounts(ns:List<Account>) { val a=JSONArray(); ns.forEach { n -> val es=JSONArray(); n.entries.forEach { es.put(JSONObject().put("id",it.id).put("subject",it.subject).put("amount",it.amount).put("date",it.date)) }; a.put(JSONObject().put("id",n.id).put("title",n.title).put("entries",es)) }; p.edit().putString("accounts",a.toString()).apply() }
 }
-class MainActivity:ComponentActivity() {
- override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); setContent { MainScreen(Repo(this)) } }
+class MainActivity:FragmentActivity() {
+ private val access by lazy{SecureAccess(this)}
+ private var unlocked by mutableStateOf(false)
+ override fun onCreate(savedInstanceState:Bundle?){
+  super.onCreate(savedInstanceState)
+  window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+  val repo=Repo(this)
+  setContent {
+   if(!access.enabled || unlocked) MainScreen(repo,access){unlocked=false}
+   else LockedScreen(access,onOpen={unlocked=true},onSystem={authenticate(it)})
+  }
+ }
+ override fun onStop(){super.onStop();if(access.enabled)unlocked=false}
+ private fun authenticate(device:Boolean){
+  val method=if(device)BiometricManager.Authenticators.DEVICE_CREDENTIAL else BiometricManager.Authenticators.BIOMETRIC_STRONG
+  if(BiometricManager.from(this).canAuthenticate(method)!=BiometricManager.BIOMETRIC_SUCCESS)return
+  val p=BiometricPrompt(this,androidx.core.content.ContextCompat.getMainExecutor(this),object:BiometricPrompt.AuthenticationCallback(){
+   override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){unlocked=true}
+  })
+  val builder=BiometricPrompt.PromptInfo.Builder().setTitle("ورود به Ani Note").setAllowedAuthenticators(method)
+  if(!device)builder.setNegativeButtonText("انصراف")
+  p.authenticate(builder.build())
+ }
 }
-@Composable fun MainScreen(repo:Repo) {
+@Composable fun MainScreen(repo:Repo,access:SecureAccess,onLock:()->Unit) {
  val context=LocalContext.current
  val font=FontFamily(Font(R.font.vazirmatn))
  val type=Typography(bodyLarge=TextStyle(fontFamily=font),bodyMedium=TextStyle(fontFamily=font),titleLarge=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=22.sp),titleMedium=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=17.sp),labelLarge=TextStyle(fontFamily=font),labelMedium=TextStyle(fontFamily=font))
@@ -166,6 +190,8 @@ class MainActivity:ComponentActivity() {
    }
    Text("توقف زنگ از دکمه «توقف یادآوری» در اعلان گوشی انجام می‌شود.",color=Color.Gray)
   }}
+  Spacer(Modifier.height(16.dp))
+  SecureSettings(access,onLock)
   Spacer(Modifier.height(16.dp))
   ElevatedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
    Text("انتقال و نگهداری اطلاعات",style=MaterialTheme.typography.titleMedium)
