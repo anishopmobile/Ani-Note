@@ -224,10 +224,10 @@ class MainActivity:ComponentActivity() {
 @Composable fun EntryForm(existing:Entry?,dismiss:()->Unit,save:(Entry)->Unit) {
  var subject by remember(existing?.id){mutableStateOf(existing?.subject?:"")};var amount by remember(existing?.id){mutableStateOf(existing?.amount?.let{kotlin.math.abs(it).toString()}?:"")};var plus by remember(existing?.id){mutableStateOf((existing?.amount?:0)>=0)};var date by remember(existing?.id){mutableLongStateOf(existing?.date?:System.currentTimeMillis())};var picker by remember{mutableStateOf(false)}
  AlertDialog(onDismissRequest=dismiss,title={Text("گردش حساب")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it.filter{c->c.isDigit()}},label={Text("مبلغ (تومان)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
+  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it.filter{c->c.isDigit() || c=='.' || c==','}},label={Text("مبلغ (تومان؛ نقطه جداکننده هزارگان)") },keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
   Row {FilterChip(plus,{plus=true},label={Text("+ واریز")});Spacer(Modifier.width(10.dp));FilterChip(!plus,{plus=false},label={Text("− برداشت")})}
   OutlinedButton(onClick={picker=true}){Text("تاریخ شمسی: "+jalali(date))}
- }},confirmButton={TextButton(onClick={val v=amount.toLongOrNull();if(subject.isNotBlank()&&v!=null&&v>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
+ }},confirmButton={TextButton(onClick={val v=parseMoney(amount);if(subject.isNotBlank()&&v!=null&&v>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
  if(picker)PersianPicker(date,{picker=false}){date=it;picker=false}
 }
 internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
@@ -314,4 +314,10 @@ internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
 
 @Composable private fun OutLinedRepeatInput(value:String,change:(String)->Unit){
  OutlinedTextField(value,change,label={Text("فاصله تکرار (دقیقه، ۱ تا ۱۴۴۰)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.fillMaxWidth())
+}
+
+internal fun parseMoney(input:String):Long? {
+ val digits=input.trim().replace(".","").replace(",","").replace("٬","")
+ if(digits.isEmpty() || !digits.all{it.isDigit()})return null
+ return digits.toLongOrNull()
 }
