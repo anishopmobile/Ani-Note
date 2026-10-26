@@ -49,14 +49,15 @@ fun money(m:Long)=String.format(Locale.US,"%,d",m)+" تومان"
 val blue=Color(0xFF4654C8)
 class Repo(val context:Context) {
  val p=context.getSharedPreferences("data",0)
- fun notes():List<Note> = try { val a=JSONArray(p.getString("notes","[]")); (0 until a.length()).map { i ->
+ val encrypted=EncryptedStore(context)
+ fun notes():List<Note> = try { val a=JSONArray(encrypted.read("notes")); (0 until a.length()).map { i ->
   val n=a.getJSONObject(i); val x=n.getJSONArray("parts"); Note(n.getString("id"),(0 until x.length()).map { j -> val s=x.getJSONObject(j); Part(s.getString("id"),s.optString("title"),s.optString("body"),s.optLong("alarm")) })
  } } catch(_:Exception) { emptyList() }
- fun saveNotes(ns:List<Note>) { val a=JSONArray(); ns.forEach { n -> val ps=JSONArray(); n.parts.forEach { ps.put(JSONObject().put("id",it.id).put("title",it.title).put("body",it.body).put("alarm",it.alarm)) }; a.put(JSONObject().put("id",n.id).put("parts",ps)) }; p.edit().putString("notes",a.toString()).apply(); Alarms.sync(context,ns) }
- fun accounts():List<Account> = try { val a=JSONArray(p.getString("accounts","[]")); (0 until a.length()).map { i ->
+ fun saveNotes(ns:List<Note>) { val a=JSONArray(); ns.forEach { n -> val ps=JSONArray(); n.parts.forEach { ps.put(JSONObject().put("id",it.id).put("title",it.title).put("body",it.body).put("alarm",it.alarm)) }; a.put(JSONObject().put("id",n.id).put("parts",ps)) }; encrypted.write("notes",a.toString()); Alarms.sync(context,ns) }
+ fun accounts():List<Account> = try { val a=JSONArray(encrypted.read("accounts")); (0 until a.length()).map { i ->
   val n=a.getJSONObject(i); val x=n.getJSONArray("entries"); Account(n.getString("id"),n.getString("title"),(0 until x.length()).map { j -> val e=x.getJSONObject(j); Entry(e.getString("id"),e.getString("subject"),e.getLong("amount"),e.getLong("date")) })
  } } catch(_:Exception) { emptyList() }
- fun saveAccounts(ns:List<Account>) { val a=JSONArray(); ns.forEach { n -> val es=JSONArray(); n.entries.forEach { es.put(JSONObject().put("id",it.id).put("subject",it.subject).put("amount",it.amount).put("date",it.date)) }; a.put(JSONObject().put("id",n.id).put("title",n.title).put("entries",es)) }; p.edit().putString("accounts",a.toString()).apply() }
+ fun saveAccounts(ns:List<Account>) { val a=JSONArray(); ns.forEach { n -> val es=JSONArray(); n.entries.forEach { es.put(JSONObject().put("id",it.id).put("subject",it.subject).put("amount",it.amount).put("date",it.date)) }; a.put(JSONObject().put("id",n.id).put("title",n.title).put("entries",es)) }; encrypted.write("accounts",a.toString()) }
 }
 class MainActivity:FragmentActivity() {
  private val access by lazy{SecureAccess(this)}
