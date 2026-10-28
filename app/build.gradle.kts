@@ -2,7 +2,16 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id(
 android {
  namespace = "com.anishop.aninote"
  compileSdk = 35
- defaultConfig { applicationId = "com.anishop.aninote.preview"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.1-preview" }
+ val buildCode = providers.environmentVariable("ANI_VERSION_CODE").orElse("2").get().toInt()
+ require(buildCode in 2..2100000000)
+ defaultConfig {
+  applicationId = "com.anishop.aninote.preview"; minSdk = 26; targetSdk = 35
+  versionCode = buildCode; versionName = "1.2-preview.$buildCode"
+  testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+ }
+ signingConfigs.getByName("debug") {
+  providers.environmentVariable("ANI_KEYSTORE").orNull?.let { storeFile = file(it) }
+ }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
  buildFeatures { compose = true }
@@ -18,4 +27,6 @@ dependencies {
  implementation("androidx.compose.ui:ui")
  implementation("androidx.core:core-ktx:1.15.0")
  testImplementation("junit:junit:4.13.2")
+ androidTestImplementation("androidx.test:runner:1.6.2")
+ androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

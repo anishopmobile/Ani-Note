@@ -68,4 +68,4 @@ class ReminderStopReceiver:BroadcastReceiver(){
   (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(id.hashCode().let{if(it==0)1 else it})
  }
 }
-class BootReceiver:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){if(i.action==Intent.ACTION_BOOT_COMPLETED)Alarms.sync(c,Repo(c).notes())}}
+class BootReceiver:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){if(i.action==Intent.ACTION_BOOT_COMPLETED || i.action==Intent.ACTION_MY_PACKAGE_REPLACED){try{Alarms.sync(c,Repo(c).notes());AniWidget.refresh(c)}catch(_:Exception){android.util.Log.e("AniNoteUpgrade","Unable to refresh stored data")}}}}

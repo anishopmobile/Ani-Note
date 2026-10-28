@@ -28,6 +28,7 @@ class EncryptedStore(context:Context){
   val stored=prefs.getString(name,"[]") ?: "[]"
   if(!stored.startsWith("gcm:")){
    // Migrate pre-encryption installs without losing their existing records.
+   org.json.JSONArray(stored) // Validate before replacing legacy plaintext.
    write(name,stored)
    return stored
   }
