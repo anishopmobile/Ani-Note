@@ -112,13 +112,13 @@ class MainActivity:FragmentActivity() {
  val shortcutPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->iconSelected=uri}
 
  val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
-  if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",0).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",1).show()}
+  if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",android.widget.Toast.LENGTH_SHORT).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",android.widget.Toast.LENGTH_LONG).show()}
  }
  val backupLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
-  if(uri!=null)try {context.contentResolver.openOutputStream(uri)?.use{it.write(BackupCodec.export(repo).toByteArray(Charsets.UTF_8))};android.widget.Toast.makeText(context,"بکاپ ذخیره شد",0).show()}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تهیه بکاپ",1).show()}
+  if(uri!=null)try {context.contentResolver.openOutputStream(uri)?.use{it.write(BackupCodec.export(repo).toByteArray(Charsets.UTF_8))};android.widget.Toast.makeText(context,"بکاپ ذخیره شد",android.widget.Toast.LENGTH_SHORT).show()}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تهیه بکاپ",android.widget.Toast.LENGTH_LONG).show()}
  }
  val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
-  if(uri!=null)try {val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()} ?: byteArrayOf();require(bytes.size<=10_000_000){"فایل بیش از حد بزرگ است"};val json=bytes.toString(Charsets.UTF_8);BackupCodec.validate(json);importedBackup=json}catch(e:Exception){android.widget.Toast.makeText(context,"فایل بکاپ معتبر نیست",1).show()}
+  if(uri!=null)try {val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()} ?: byteArrayOf();require(bytes.size<=10_000_000){"فایل بیش از حد بزرگ است"};val json=bytes.toString(Charsets.UTF_8);BackupCodec.validate(json);importedBackup=json}catch(e:Exception){android.widget.Toast.makeText(context,"فایل بکاپ معتبر نیست",android.widget.Toast.LENGTH_LONG).show()}
  }
  val ringtoneLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){result->
   if(result.resultCode==android.app.Activity.RESULT_OK){
@@ -129,7 +129,7 @@ class MainActivity:FragmentActivity() {
   }
  }
  fun exportPdf(title:String,lines:List<String>){
-  try {pendingExport=PdfReports.create(context,title,lines);pdfLauncher.launch("AniNote-"+System.currentTimeMillis()+".pdf")}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تولید PDF",1).show()}
+  try {pendingExport=PdfReports.create(context,title,lines);pdfLauncher.launch("AniNote-"+System.currentTimeMillis()+".pdf")}catch(e:Exception){android.widget.Toast.makeText(context,"خطا در تولید PDF",android.widget.Toast.LENGTH_LONG).show()}
  }
 
  val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
@@ -212,7 +212,7 @@ class MainActivity:FragmentActivity() {
    OutlinedButton(onClick={shortcutPicker.launch("image/*")}){Text("انتخاب عکس از گالری")}
    if(iconSelected!=null)Button(onClick={
     val ok=try{CustomShortcut.pin(context,iconSelected!!)}catch(e:Exception){false}
-    android.widget.Toast.makeText(context,if(ok)"درخواست افزودن میانبر به صفحه اصلی ارسال شد" else "لانچر گوشی از میانبر شخصی پشتیبانی نمی‌کند",1).show()
+    android.widget.Toast.makeText(context,if(ok)"درخواست افزودن میانبر به صفحه اصلی ارسال شد" else "لانچر گوشی از میانبر شخصی پشتیبانی نمی‌کند",android.widget.Toast.LENGTH_LONG).show()
    }){Text("ذخیره و ساخت میانبر آیکن")}
   }}
   Spacer(Modifier.height(14.dp))
@@ -270,7 +270,7 @@ class MainActivity:FragmentActivity() {
  if(deletingNote!=null) DeleteDialog({val id=deletingNote!!;notes.removeAll{it.id==id};repo.saveNotes(notes);deletingNote=null},{deletingNote=null})
  if(deletingAccount!=null) DeleteDialog({val id=deletingAccount!!;accounts.removeAll{it.id==id};repo.saveAccounts(accounts);deletingAccount=null},{deletingAccount=null})
  if(importedBackup!=null) AlertDialog(onDismissRequest={importedBackup=null},title={Text("تأیید بازیابی بکاپ")},text={Text("اطلاعات فعلی با اطلاعات فایل بکاپ جایگزین می‌شوند. قبل از ادامه از اطلاعات فعلی نسخه پشتیبان تهیه کنید.")},confirmButton={TextButton(onClick={
-  try{BackupCodec.restore(repo,importedBackup!!);notes.clear();notes.addAll(repo.notes());accounts.clear();accounts.addAll(repo.accounts());sound=repo.p.getString("sound_uri","")?:"";NotificationSounds.channel(context,sound);importedBackup=null;android.widget.Toast.makeText(context,"بازیابی انجام شد",0).show()}catch(e:Exception){importedBackup=null;android.widget.Toast.makeText(context,"خطا در بازیابی",1).show()}
+  try{BackupCodec.restore(repo,importedBackup!!);notes.clear();notes.addAll(repo.notes());accounts.clear();accounts.addAll(repo.accounts());sound=repo.p.getString("sound_uri","")?:"";NotificationSounds.channel(context,sound);importedBackup=null;android.widget.Toast.makeText(context,"بازیابی انجام شد",android.widget.Toast.LENGTH_SHORT).show()}catch(e:Exception){importedBackup=null;android.widget.Toast.makeText(context,"خطا در بازیابی",android.widget.Toast.LENGTH_LONG).show()}
  }){Text("بازیابی")}},dismissButton={TextButton(onClick={importedBackup=null}){Text("انصراف")}})
  if(newAccount) AlertDialog(onDismissRequest={newAccount=false},title={Text("ایجاد حساب")},text={OutlinedTextField(accountName,{accountName=it},label={Text("عنوان حساب")})},confirmButton={TextButton(onClick={if(accountName.isNotBlank()){val a=Account(title=accountName.trim());accounts.add(a);repo.saveAccounts(accounts);openAccount=a.id;newAccount=false}}){Text("ایجاد")}},dismissButton={TextButton(onClick={newAccount=false}){Text("انصراف")}})
  } }
@@ -294,7 +294,7 @@ class MainActivity:FragmentActivity() {
   if(datePicker) PersianPicker(if(part.alarm>0)part.alarm else System.currentTimeMillis(),{datePicker=false}){date->
    datePicker=false
    val cal=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply{timeInMillis=date}
-   TimePickerDialog(context,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it})) else android.widget.Toast.makeText(context,"زمان یادآوری باید در آینده باشد",1).show()},9,0,true).show()
+   TimePickerDialog(context,{_,h,m->cal.set(11,h);cal.set(12,m);cal.set(13,0);if(cal.timeInMillis>System.currentTimeMillis())update(n.copy(parts=n.parts.map{if(it.id==part.id)it.copy(alarm=cal.timeInMillis)else it})) else android.widget.Toast.makeText(context,"زمان یادآوری باید در آینده باشد",android.widget.Toast.LENGTH_LONG).show()},9,0,true).show()
   }
  }
  item { OutlinedButton(onClick={update(n.copy(parts=n.parts+Part()))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PostAdd,null);Text(" Page Break • بخش جدید")} }

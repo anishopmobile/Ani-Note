@@ -89,18 +89,18 @@ import androidx.compose.foundation.text.KeyboardOptions
     Text("اثر انگشت گوشی",Modifier.weight(1f))
     Switch(checked=bio,onCheckedChange={v->
      if(!v){bio=false;access.biometric=false}
-     else if(!access.hasPin()&&!access.hasPattern())android.widget.Toast.makeText(context,"ابتدا رمز یا الگوی پشتیبان تعریف کنید",1).show()
+     else if(!access.hasPin()&&!access.hasPattern())android.widget.Toast.makeText(context,"ابتدا رمز یا الگوی پشتیبان تعریف کنید",android.widget.Toast.LENGTH_LONG).show()
      else if(androidx.biometric.BiometricManager.from(context).canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)==androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS){bio=true;access.biometric=true}
-     else android.widget.Toast.makeText(context,"اثر انگشت امن روی گوشی تنظیم نشده",1).show()
+     else android.widget.Toast.makeText(context,"اثر انگشت امن روی گوشی تنظیم نشده",android.widget.Toast.LENGTH_LONG).show()
     })
    }
    Row(verticalAlignment=Alignment.CenterVertically){
     Text("الگو یا رمز پیش‌فرض گوشی",Modifier.weight(1f))
     Switch(checked=device,onCheckedChange={v->
      if(!v){device=false;access.deviceCredential=false}
-     else if(!access.hasPin()&&!access.hasPattern())android.widget.Toast.makeText(context,"ابتدا رمز یا الگوی پشتیبان تعریف کنید",1).show()
+     else if(!access.hasPin()&&!access.hasPattern())android.widget.Toast.makeText(context,"ابتدا رمز یا الگوی پشتیبان تعریف کنید",android.widget.Toast.LENGTH_LONG).show()
      else if(androidx.biometric.BiometricManager.from(context).canAuthenticate(androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)==androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS){device=true;access.deviceCredential=true}
-     else android.widget.Toast.makeText(context,"قفل پیش‌فرض گوشی فعال نیست",1).show()
+     else android.widget.Toast.makeText(context,"قفل پیش‌فرض گوشی فعال نیست",android.widget.Toast.LENGTH_LONG).show()
     })
    }
    if(active)OutlinedButton(onClick=onLock){Text("قفل‌کردن برنامه")}
