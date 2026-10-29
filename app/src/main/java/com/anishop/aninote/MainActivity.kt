@@ -63,19 +63,21 @@ class MainActivity:FragmentActivity() {
  private val access by lazy{SecureAccess(this)}
  private var unlocked by mutableStateOf(false)
  private var requestedNote by mutableStateOf<String?>(null)
+ private var widgetSettings by mutableStateOf(false)
  override fun onCreate(savedInstanceState:Bundle?){
   super.onCreate(savedInstanceState)
   window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
   requestedNote=intent?.getStringExtra("open_note_id")
+  widgetSettings=intent?.getBooleanExtra("widget_settings",false) ?: false
   val repo=Repo(this)
   val readable=try{repo.notes();repo.accounts();true}catch(_:Exception){false}
   setContent {
    if(!readable) MaterialTheme { Text("خواندن داده‌ها ممکن نشد. برای حفظ اطلاعات، ویرایش متوقف شد. برنامه را حذف نکنید؛ از بکاپ معتبر یا پشتیبانی کمک بگیرید.") }
-   else if(!access.enabled || unlocked) MainScreen(repo,access,requestedNote){unlocked=false}
+   else if(!access.enabled || unlocked) MainScreen(repo,access,requestedNote,widgetSettings){unlocked=false}
    else LockedScreen(access,onOpen={unlocked=true},onSystem={authenticate(it)})
   }
  }
- override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);requestedNote=intent.getStringExtra("open_note_id")}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);requestedNote=intent.getStringExtra("open_note_id");widgetSettings=intent.getBooleanExtra("widget_settings",false)}
  override fun onStop(){super.onStop();if(access.enabled)unlocked=false}
  private fun authenticate(device:Boolean){
   val method=if(device)BiometricManager.Authenticators.DEVICE_CREDENTIAL else BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -88,14 +90,14 @@ class MainActivity:FragmentActivity() {
   p.authenticate(builder.build())
  }
 }
-@Composable fun MainScreen(repo:Repo,access:SecureAccess,requestedNote:String?,onLock:()->Unit) {
+@Composable fun MainScreen(repo:Repo,access:SecureAccess,requestedNote:String?,widgetSettings:Boolean,onLock:()->Unit) {
  val context=LocalContext.current
  val font=FontFamily(Font(R.font.vazirmatn))
  val type=Typography(bodyLarge=TextStyle(fontFamily=font),bodyMedium=TextStyle(fontFamily=font),titleLarge=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=22.sp),titleMedium=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=17.sp),labelLarge=TextStyle(fontFamily=font),labelMedium=TextStyle(fontFamily=font))
  val notes=remember { mutableStateListOf<Note>().apply { addAll(repo.notes()) } }
  val accounts=remember { mutableStateListOf<Account>().apply { addAll(repo.accounts()) } }
- var tab by remember { mutableIntStateOf(0) }; var openNote by remember { mutableStateOf<String?>(null) }
- LaunchedEffect(requestedNote){ if(requestedNote!=null && notes.any{it.id==requestedNote}){openNote=requestedNote;tab=0} }; var openAccount by remember { mutableStateOf<String?>(null) }
+ var tab by remember { mutableIntStateOf(if(widgetSettings)3 else 0) }; var openNote by remember { mutableStateOf<String?>(null) }
+ LaunchedEffect(requestedNote,widgetSettings){ if(requestedNote!=null && notes.any{it.id==requestedNote}){openNote=requestedNote;tab=0} else if(widgetSettings){openNote=null;tab=3} }; var openAccount by remember { mutableStateOf<String?>(null) }
  var newAccount by remember { mutableStateOf(false) }; var accountName by remember { mutableStateOf("") }
  var deletingNote by remember { mutableStateOf<String?>(null) }
  var deletingAccount by remember { mutableStateOf<String?>(null) }
