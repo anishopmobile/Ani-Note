@@ -62,17 +62,20 @@ class Repo(val context:Context) {
 class MainActivity:FragmentActivity() {
  private val access by lazy{SecureAccess(this)}
  private var unlocked by mutableStateOf(false)
+ private var requestedNote by mutableStateOf<String?>(null)
  override fun onCreate(savedInstanceState:Bundle?){
   super.onCreate(savedInstanceState)
   window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+  requestedNote=intent?.getStringExtra("open_note_id")
   val repo=Repo(this)
   val readable=try{repo.notes();repo.accounts();true}catch(_:Exception){false}
   setContent {
    if(!readable) MaterialTheme { Text("خواندن داده‌ها ممکن نشد. برای حفظ اطلاعات، ویرایش متوقف شد. برنامه را حذف نکنید؛ از بکاپ معتبر یا پشتیبانی کمک بگیرید.") }
-   else if(!access.enabled || unlocked) MainScreen(repo,access){unlocked=false}
+   else if(!access.enabled || unlocked) MainScreen(repo,access,requestedNote){unlocked=false}
    else LockedScreen(access,onOpen={unlocked=true},onSystem={authenticate(it)})
   }
  }
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);requestedNote=intent.getStringExtra("open_note_id")}
  override fun onStop(){super.onStop();if(access.enabled)unlocked=false}
  private fun authenticate(device:Boolean){
   val method=if(device)BiometricManager.Authenticators.DEVICE_CREDENTIAL else BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -85,13 +88,14 @@ class MainActivity:FragmentActivity() {
   p.authenticate(builder.build())
  }
 }
-@Composable fun MainScreen(repo:Repo,access:SecureAccess,onLock:()->Unit) {
+@Composable fun MainScreen(repo:Repo,access:SecureAccess,requestedNote:String?,onLock:()->Unit) {
  val context=LocalContext.current
  val font=FontFamily(Font(R.font.vazirmatn))
  val type=Typography(bodyLarge=TextStyle(fontFamily=font),bodyMedium=TextStyle(fontFamily=font),titleLarge=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=22.sp),titleMedium=TextStyle(fontFamily=font,fontWeight=FontWeight.Bold,fontSize=17.sp),labelLarge=TextStyle(fontFamily=font),labelMedium=TextStyle(fontFamily=font))
  val notes=remember { mutableStateListOf<Note>().apply { addAll(repo.notes()) } }
  val accounts=remember { mutableStateListOf<Account>().apply { addAll(repo.accounts()) } }
- var tab by remember { mutableIntStateOf(0) }; var openNote by remember { mutableStateOf<String?>(null) }; var openAccount by remember { mutableStateOf<String?>(null) }
+ var tab by remember { mutableIntStateOf(0) }; var openNote by remember { mutableStateOf<String?>(null) }
+ LaunchedEffect(requestedNote){ if(requestedNote!=null && notes.any{it.id==requestedNote}){openNote=requestedNote;tab=0} }; var openAccount by remember { mutableStateOf<String?>(null) }
  var newAccount by remember { mutableStateOf(false) }; var accountName by remember { mutableStateOf("") }
  var deletingNote by remember { mutableStateOf<String?>(null) }
  var deletingAccount by remember { mutableStateOf<String?>(null) }
@@ -108,8 +112,6 @@ class MainActivity:FragmentActivity() {
  var widgetNoteIds by remember { mutableStateOf(context.getSharedPreferences("widget_prefs",0).getStringSet("notes",emptySet()).orEmpty().toSet()) }
  var widgetAccountIds by remember { mutableStateOf(context.getSharedPreferences("widget_prefs",0).getStringSet("accounts",emptySet()).orEmpty().toSet()) }
 
- var iconSelected by remember {mutableStateOf<Uri?>(null)}
- val shortcutPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->iconSelected=uri}
 
  val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
   if(uri!=null)try { context.contentResolver.openOutputStream(uri)?.use{it.write(pendingExport ?: byteArrayOf())};android.widget.Toast.makeText(context,"گزارش PDF ذخیره شد",android.widget.Toast.LENGTH_SHORT).show() }catch(e:Exception){android.widget.Toast.makeText(context,"خطا در ذخیره PDF",android.widget.Toast.LENGTH_LONG).show()}
