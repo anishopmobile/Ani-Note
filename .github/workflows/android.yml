@@ -33,7 +33,8 @@ jobs:
             printf '%s' "$MAIN_KEYSTORE_BASE64" | base64 --decode > "$key"
           fi
           if [ ! -f "$key" ]; then
-            keytool -genkeypair -keystore "$key" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Ani Note Main' -keyalg RSA -keysize 3072 -validity 10000
+            echo 'Signing key unavailable: restore MAIN_KEYSTORE_BASE64' >&2
+            exit 1
           fi
           echo "ANI_KEYSTORE=$key" >> "$GITHUB_ENV"
           echo "ANI_VERSION_CODE=$((200000 + ${{ github.run_number }} * 100 + ${{ github.run_attempt }}))" >> "$GITHUB_ENV"
@@ -43,11 +44,12 @@ jobs:
           mkdir -p app/src/main/res/font
           curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
       - name: Test, lint and build
-        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
+        run: gradle --no-daemon testDebugUnitTest lintRelease assembleRelease
       - name: Prepare main APK
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Ani-Note-main.apk
+          cp app/build/outputs/apk/release/app-release.apk Ani-Note-main.apk
           sha256sum Ani-Note-main.apk > SHA256SUMS
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Ani-Note-main.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Ani-Note-Main-APK
