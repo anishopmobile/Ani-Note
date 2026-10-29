@@ -206,16 +206,6 @@ class MainActivity:FragmentActivity() {
    Text("توقف زنگ از دکمه «توقف یادآوری» در اعلان گوشی انجام می‌شود.",color=Color.Gray)
   }}
   Spacer(Modifier.height(16.dp))
-  ElevatedCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-   Text("تغییر آیکن برنامه",style=MaterialTheme.typography.titleMedium)
-   Text("اندروید اجازه تعویض مستقیم آیکن اصلی با عکس گالری را نمی‌دهد؛ می‌توانید با عکس انتخابی میانبر جدیدی روی صفحه اصلی بسازید.")
-   OutlinedButton(onClick={shortcutPicker.launch("image/*")}){Text("انتخاب عکس از گالری")}
-   if(iconSelected!=null)Button(onClick={
-    val ok=try{CustomShortcut.pin(context,iconSelected!!)}catch(e:Exception){false}
-    android.widget.Toast.makeText(context,if(ok)"درخواست افزودن میانبر به صفحه اصلی ارسال شد" else "لانچر گوشی از میانبر شخصی پشتیبانی نمی‌کند",android.widget.Toast.LENGTH_LONG).show()
-   }){Text("ذخیره و ساخت میانبر آیکن")}
-  }}
-  Spacer(Modifier.height(14.dp))
   ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
    Text("تنظیمات تقویم",style=MaterialTheme.typography.titleMedium)
    Row(verticalAlignment=Alignment.CenterVertically){Text("مناسبت‌های ثبت‌شده",Modifier.weight(1f));Switch(showCalendarEvents,{showCalendarEvents=it;repo.p.edit().putBoolean("calendar_events",it).apply()})}
