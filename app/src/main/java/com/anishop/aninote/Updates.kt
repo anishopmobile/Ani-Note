@@ -14,12 +14,12 @@ import javax.net.ssl.HttpsURLConnection
 
 object UpdatePolicy {
  const val releases = "https://api.github.com/repos/anishopmobile/Ani-Note/releases?per_page=100"
- fun code(tag:String):Int? = Regex("preview-v([1-9][0-9]{0,9})").matchEntire(tag)
+ fun code(tag:String):Int? = Regex("main-v([1-9][0-9]{0,9})").matchEntire(tag)
   ?.groupValues?.get(1)?.toIntOrNull()?.takeIf{it<=2100000000}
  fun safeAsset(url:String):Boolean = try {
   val u=java.net.URI(url)
   u.scheme=="https" && u.host=="github.com" && u.port==-1 && u.userInfo==null && u.query==null && u.fragment==null &&
-   Regex("/anishopmobile/Ani-Note/releases/download/preview-v[0-9]+/Ani-Note-preview-[0-9]+\\.apk").matches(u.rawPath)
+   Regex("/anishopmobile/Ani-Note/releases/download/main-v[0-9]+/Ani-Note-main-[0-9]+\\.apk").matches(u.rawPath)
  } catch(_:Exception){false}
 }
 data class AvailableUpdate(val code:Int,val url:String)
@@ -29,7 +29,7 @@ object Updates {
   connection.connectTimeout=15000; connection.readTimeout=15000
   connection.instanceFollowRedirects=false
   connection.setRequestProperty("Accept","application/vnd.github+json")
-  connection.setRequestProperty("User-Agent","Ani-Note-Preview")
+  connection.setRequestProperty("User-Agent","Ani-Note-Main")
   connection.useCaches=false
   try {
    check(connection.responseCode==200)
@@ -38,15 +38,15 @@ object Updates {
    val candidates=mutableListOf<AvailableUpdate>()
    for(i in 0 until releases.length()) {
     val release=releases.getJSONObject(i)
-    if(release.optBoolean("draft") || !release.optBoolean("prerelease"))continue
+    if(release.optBoolean("draft") || release.optBoolean("prerelease"))continue
     val code=UpdatePolicy.code(release.optString("tag_name"))?:continue
     if(code<=installed)continue
     val assets=release.optJSONArray("assets")?:continue
     for(j in 0 until assets.length()) {
      val asset=assets.getJSONObject(j)
      val url=asset.optString("browser_download_url")
-     if(asset.optString("name")=="Ani-Note-preview-$code.apk" && UpdatePolicy.safeAsset(url) &&
-      url.endsWith("/preview-v$code/Ani-Note-preview-$code.apk"))candidates.add(AvailableUpdate(code,url))
+     if(asset.optString("name")=="Ani-Note-main-$code.apk" && UpdatePolicy.safeAsset(url) &&
+      url.endsWith("/main-v$code/Ani-Note-main-$code.apk"))candidates.add(AvailableUpdate(code,url))
     }
    }
    return candidates.maxByOrNull{it.code}
@@ -72,7 +72,7 @@ object Updates {
  Button(enabled=!busy,onClick={
   busy=true;update=null
   scope.launch {
-   try{update=withContext(Dispatchers.IO){Updates.check(code)};message=if(update==null)"نسخه جدیدتری برای Preview منتشر نشده است." else "نسخه جدید آماده دریافت است."}
+   try{update=withContext(Dispatchers.IO){Updates.check(code)};message=if(update==null)"نسخه جدیدتری برای برنامه اصلی منتشر نشده است." else "نسخه جدید آماده دریافت است."}
    catch(_:Exception){message="بررسی بروزرسانی ممکن نشد؛ اتصال اینترنت را بررسی و دوباره تلاش کنید."}
    finally{busy=false}
   }
