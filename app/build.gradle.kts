@@ -12,6 +12,11 @@ android {
  signingConfigs.getByName("debug") {
   providers.environmentVariable("ANI_KEYSTORE").orNull?.let { storeFile = file(it) }
  }
+ buildTypes.getByName("release") {
+  isDebuggable = false
+  isMinifyEnabled = false
+  signingConfig = signingConfigs.getByName("debug")
+ }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
  buildFeatures { compose = true }
