@@ -5,8 +5,8 @@ android {
  val buildCode = providers.environmentVariable("ANI_VERSION_CODE").orElse("2").get().toInt()
  require(buildCode in 2..2100000000)
  defaultConfig {
-  applicationId = "com.anishop.aninote.preview"; minSdk = 26; targetSdk = 35
-  versionCode = buildCode; versionName = "1.2-preview.$buildCode"
+  applicationId = "com.anishop.aninote"; minSdk = 26; targetSdk = 35
+  versionCode = buildCode; versionName = "1.3.$buildCode"
   testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
  }
  signingConfigs.getByName("debug") {
