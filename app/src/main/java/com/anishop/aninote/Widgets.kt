@@ -90,7 +90,7 @@ abstract class AniWidget:AppWidgetProvider(){
    }
    views.setTextViewText(R.id.widget_title,label)
    views.setTextViewText(R.id.widget_text,if(type=="calendar")"" else if(type=="note")"برای انتخاب یادداشت‌ها: تنظیمات ← ویجت‌ها" else content)
-   views.setOnClickPendingIntent(R.id.widget_root,PendingIntent.getActivity(c,id,Intent(c,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+   views.setOnClickPendingIntent(R.id.widget_root,PendingIntent.getActivity(c,id,Intent(c,MainActivity::class.java).putExtra("widget_settings",type=="note"),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
    m.updateAppWidget(id,views)
   }
   fun refresh(c:Context){
