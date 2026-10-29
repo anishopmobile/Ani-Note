@@ -8,18 +8,6 @@ import android.graphics.drawable.Icon
 import android.content.pm.*
 import android.net.Uri
 
-object CustomShortcut {
- fun pin(context:Context,uri:Uri):Boolean {
-  val manager=context.getSystemService(ShortcutManager::class.java)
-  if(!manager.isRequestPinShortcutSupported)return false
-  val original=context.contentResolver.openInputStream(uri)?.use{BitmapFactory.decodeStream(it)}?:return false
-  val square=Bitmap.createScaledBitmap(original,192,192,true)
-  val shortcut=ShortcutInfo.Builder(context,"ani_personal_icon")
-   .setShortLabel("Ani Note").setIcon(Icon.createWithBitmap(square))
-   .setIntent(Intent(context,MainActivity::class.java).setAction(Intent.ACTION_MAIN)).build()
-  return manager.requestPinShortcut(shortcut,null)
- }
-}
 abstract class AniWidget:AppWidgetProvider(){
  protected abstract val type:String
  override fun onUpdate(context:Context,manager:AppWidgetManager,ids:IntArray){
