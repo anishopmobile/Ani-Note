@@ -40,11 +40,14 @@ jobs:
       - name: Capture real published screens with synthetic data
         uses: reactivecircus/android-emulator-runner@v2
         with:
+          profile: pixel_2
+          disable-spellchecker: true
+          enable-hw-keyboard: true
           api-level: 29
           arch: x86_64
           disable-animations: true
           script: |
-            adb shell wm size 1080x1920
+            adb shell wm size reset
             adb shell wm density 400
             adb shell settings put global sysui_demo_allowed 1
             adb shell am broadcast -a com.android.systemui.demo -e command enter

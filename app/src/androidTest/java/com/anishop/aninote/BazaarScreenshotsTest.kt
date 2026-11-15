@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -32,6 +33,13 @@ class BazaarScreenshotsTest {
    val folder=File(context.getExternalFilesDir(null),"bazaar-screenshots").apply{mkdirs()}
    File(folder,"$name.png").outputStream().use{check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))}
   } finally {bitmap.recycle()}
+ }
+ private fun alignSectionTop(title:String) {
+  val node=compose.onNodeWithText(title)
+  node.performScrollTo()
+  val delta=node.fetchSemanticsNode().boundsInRoot.top-300f
+  if(delta>1f)node.onAncestors().filter(hasScrollAction()).onFirst().performSemanticsAction(SemanticsActions.ScrollBy){it(0f,delta)}
+  compose.waitForIdle()
  }
  private fun allowCapture(scenario:ActivityScenario<MainActivity>) {
   scenario.onActivity {
@@ -90,9 +98,9 @@ class BazaarScreenshotsTest {
    repeat(month){compose.onNodeWithContentDescription("ماه قبل").performClick()}
    capture("06-persian-calendar")
    compose.onNodeWithText("تنظیمات").performClick()
-   compose.onNodeWithText("تنظیمات پخش زنگ").performScrollTo()
+   alignSectionTop("تنظیمات پخش زنگ")
    capture("07-reminder-settings")
-   compose.onNodeWithText("ورود امن به برنامه").performScrollTo()
+   alignSectionTop("ورود امن به برنامه")
    capture("08-security-settings")
   }
   access.enabled=true
