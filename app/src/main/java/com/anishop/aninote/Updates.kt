@@ -38,7 +38,7 @@ object Updates {
   } finally {connection.disconnect()}
  }
  /** Match the stable recovery channel kept for compatibility with installed 306402. */
- internal fun select(response:String,installed:Long):AvailableUpdate? {
+ fun select(response:String,installed:Long):AvailableUpdate? {
    val releases=JSONArray(response)
    val candidates=mutableListOf<AvailableUpdate>()
    for(i in 0 until releases.length()) {
