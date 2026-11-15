@@ -1,7 +1,7 @@
 name: Build Ani Note Main APK
 on:
   push:
-    branches: [main, feature/calendar-widgets-icon]
+    branches: [main, feature/calendar-widgets-icon, fix/decimal-account-amounts]
   workflow_dispatch:
 permissions:
   contents: write
@@ -44,7 +44,37 @@ jobs:
           mkdir -p app/src/main/res/font
           curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
       - name: Test, lint and build
-        run: gradle --no-daemon testDebugUnitTest lintRelease assembleRelease
+        run: gradle --no-daemon testDebugUnitTest lintRelease assembleRelease assembleDebugAndroidTest
+      - name: Download previous main APK for upgrade test
+        run: |
+          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/previous.apk
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test upgrade from published APK and decimal persistence
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install /tmp/previous.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e phase seed com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/seed.txt
+            grep -q 'OK (' /tmp/seed.txt
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell am instrument -w -e phase verify com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/verify.txt
+            grep -q 'OK (' /tmp/verify.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: decimal-validation-reports
+          path: |
+            app/build/reports/
+            /tmp/seed.txt
+            /tmp/verify.txt
       - name: Prepare main APK
         run: |
           cp app/build/outputs/apk/release/app-release.apk Ani-Note-main.apk

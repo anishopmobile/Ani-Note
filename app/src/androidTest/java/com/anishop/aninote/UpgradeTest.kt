@@ -22,7 +22,7 @@ class UpgradeTest {
   }
   val repo=Repo(context)
   assertEquals("یادداشت قدیمی",repo.notes().single().parts.single().title)
-  assertEquals(22500L,repo.accounts().single().entries.single().amount)
+  assertEquals(0,java.math.BigDecimal("22500").compareTo(repo.accounts().single().entries.single().amount))
   assertFalse(p.getBoolean("calendar_events",true))
   assertTrue(p.getString("notes","")!!.startsWith("gcm:"))
   assertTrue(p.getString("accounts","")!!.startsWith("gcm:"))

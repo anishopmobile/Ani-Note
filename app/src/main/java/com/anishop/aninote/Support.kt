@@ -20,7 +20,7 @@ import java.io.ByteArrayOutputStream
 object BackupCodec {
  fun export(repo:Repo):String = JSONObject()
   .put("format","ani-note-backup")
-  .put("version",1)
+  .put("version",2)
   .put("created",System.currentTimeMillis())
   .put("notes",JSONArray(repo.encrypted.read("notes")))
   .put("accounts",JSONArray(repo.encrypted.read("accounts")))
@@ -31,7 +31,7 @@ object BackupCodec {
   .toString(2)
  fun validate(text:String):JSONObject {
   val json=JSONObject(text)
-  require(json.getString("format")=="ani-note-backup" && json.getInt("version")==1)
+  require(json.getString("format")=="ani-note-backup" && json.getInt("version") in 1..2)
   val notes=json.getJSONArray("notes")
   val accounts=json.getJSONArray("accounts")
   require(notes.length()<=10000 && accounts.length()<=10000)
@@ -52,7 +52,7 @@ object BackupCodec {
    require(entries.length()<=100000)
    for(j in 0 until entries.length()){
     val e=entries.getJSONObject(j)
-    e.getString("id");e.getString("subject");e.getLong("amount");e.getLong("date")
+    e.getString("id");e.getString("subject");storedMoney(e.get("amount").toString());e.getLong("date")
    }
   }
   require(json.optInt("ring_duration",20) in 1..300)

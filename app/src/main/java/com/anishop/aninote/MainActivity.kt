@@ -36,16 +36,17 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.platform.LocalContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.math.BigDecimal
 import java.util.UUID
 import java.util.Locale
 
 data class Part(val id:String=UUID.randomUUID().toString(), val title:String="", val body:String="", val alarm:Long=0)
 data class Note(val id:String=UUID.randomUUID().toString(), val parts:List<Part> = listOf(Part()))
-data class Entry(val id:String=UUID.randomUUID().toString(), val subject:String="", val amount:Long=0, val date:Long=System.currentTimeMillis())
+data class Entry(val id:String=UUID.randomUUID().toString(), val subject:String="", val amount:BigDecimal=BigDecimal.ZERO, val date:Long=System.currentTimeMillis())
 data class Account(val id:String=UUID.randomUUID().toString(), val title:String="", val entries:List<Entry> = emptyList())
 fun jalali(m:Long):String { val c=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply { timeInMillis=m }; return "%04d/%02d/%02d".format(Locale.US,c.get(1),c.get(2)+1,c.get(5)) }
 fun clock(m:Long):String { val c=PersianCalendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply { timeInMillis=m }; return "%02d:%02d".format(Locale.US,c.get(11),c.get(12)) }
-fun money(m:Long)=String.format(Locale.US,"%,d",m)+" تومان"
+
 val blue=Color(0xFF4654C8)
 class Repo(val context:Context) {
  val p=context.getSharedPreferences("data",0)
@@ -55,9 +56,9 @@ class Repo(val context:Context) {
  } } catch(e:Exception) { throw IllegalStateException("Stored data could not be read",e) }
  fun saveNotes(ns:List<Note>) { val a=JSONArray(); ns.forEach { n -> val ps=JSONArray(); n.parts.forEach { ps.put(JSONObject().put("id",it.id).put("title",it.title).put("body",it.body).put("alarm",it.alarm)) }; a.put(JSONObject().put("id",n.id).put("parts",ps)) }; encrypted.write("notes",a.toString()); Alarms.sync(context,ns); AniWidget.refresh(context) }
  fun accounts():List<Account> = try { val a=JSONArray(encrypted.read("accounts")); (0 until a.length()).map { i ->
-  val n=a.getJSONObject(i); val x=n.getJSONArray("entries"); Account(n.getString("id"),n.getString("title"),(0 until x.length()).map { j -> val e=x.getJSONObject(j); Entry(e.getString("id"),e.getString("subject"),e.getLong("amount"),e.getLong("date")) })
+  val n=a.getJSONObject(i); val x=n.getJSONArray("entries"); Account(n.getString("id"),n.getString("title"),(0 until x.length()).map { j -> val e=x.getJSONObject(j); Entry(e.getString("id"),e.getString("subject"),storedMoney(e.get("amount").toString()),e.getLong("date")) })
  } } catch(e:Exception) { throw IllegalStateException("Stored data could not be read",e) }
- fun saveAccounts(ns:List<Account>) { val a=JSONArray(); ns.forEach { n -> val es=JSONArray(); n.entries.forEach { es.put(JSONObject().put("id",it.id).put("subject",it.subject).put("amount",it.amount).put("date",it.date)) }; a.put(JSONObject().put("id",n.id).put("title",n.title).put("entries",es)) }; encrypted.write("accounts",a.toString()); AniWidget.refresh(context) }
+ fun saveAccounts(ns:List<Account>) { val a=JSONArray(); ns.forEach { n -> val es=JSONArray(); n.entries.forEach { es.put(JSONObject().put("id",it.id).put("subject",it.subject).put("amount",it.amount.toPlainString()).put("date",it.date)) }; a.put(JSONObject().put("id",n.id).put("title",n.title).put("entries",es)) }; encrypted.write("accounts",a.toString()); AniWidget.refresh(context) }
 }
 class MainActivity:FragmentActivity() {
  private val access by lazy{SecureAccess(this)}
@@ -302,18 +303,18 @@ class MainActivity:FragmentActivity() {
  Spacer(Modifier.height(12.dp))
  Button(onClick={editing=null;add=true},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text(" ثبت گردش جدید")}
  Spacer(Modifier.height(12.dp))
- LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(a.entries.sortedByDescending{it.date},key={it.id}){e->ElevatedCard{ Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.subject);Text(jalali(e.date),color=Color.Gray)};Text((if(e.amount>0)"+"else "")+money(e.amount),color=if(e.amount>=0)Color(0xFF16804A)else Color.Red);IconButton(onClick={editing=e;add=true}){Icon(Icons.Default.Edit,"ویرایش")};IconButton(onClick={update(a.copy(entries=a.entries.filterNot{it.id==e.id}))}){Icon(Icons.Default.DeleteOutline,"حذف")}} }} }
+ LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(a.entries.sortedByDescending{it.date},key={it.id}){e->ElevatedCard{ Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.subject);Text(jalali(e.date),color=Color.Gray)};Text((if(e.amount.signum()>0)"+"else "")+money(e.amount),color=if(e.amount.signum()>=0)Color(0xFF16804A)else Color.Red);IconButton(onClick={editing=e;add=true}){Icon(Icons.Default.Edit,"ویرایش")};IconButton(onClick={update(a.copy(entries=a.entries.filterNot{it.id==e.id}))}){Icon(Icons.Default.DeleteOutline,"حذف")}} }} }
  if(add) EntryForm(editing,{add=false}){e->update(a.copy(entries=if(editing==null)a.entries+e else a.entries.map{if(it.id==e.id)e else it}));add=false}
  if(rename) AlertDialog(onDismissRequest={rename=false},title={Text("ویرایش عنوان حساب")},text={OutlinedTextField(name,{name=it})},confirmButton={TextButton(onClick={if(name.isNotBlank()){update(a.copy(title=name));rename=false}}){Text("ذخیره")}})
  if(askDelete) DeleteDialog(delete,{askDelete=false})
 }
 @Composable fun EntryForm(existing:Entry?,dismiss:()->Unit,save:(Entry)->Unit) {
- var subject by remember(existing?.id){mutableStateOf(existing?.subject?:"")};var amount by remember(existing?.id){mutableStateOf(existing?.amount?.let{kotlin.math.abs(it).toString()}?:"")};var plus by remember(existing?.id){mutableStateOf((existing?.amount?:0)>=0)};var date by remember(existing?.id){mutableLongStateOf(existing?.date?:System.currentTimeMillis())};var picker by remember{mutableStateOf(false)}
+ var subject by remember(existing?.id){mutableStateOf(existing?.subject?:"")};var amount by remember(existing?.id){mutableStateOf(existing?.amount?.let{editableMoney(it)}?:"")};var plus by remember(existing?.id){mutableStateOf((existing?.amount?.signum()?:0)>=0)};var date by remember(existing?.id){mutableLongStateOf(existing?.date?:System.currentTimeMillis())};var picker by remember{mutableStateOf(false)}
  AlertDialog(onDismissRequest=dismiss,title={Text("گردش حساب")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it.filter{c->c.isDigit() || c=='.' || c==','}},label={Text("مبلغ (تومان؛ نقطه جداکننده هزارگان)") },keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
+  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it},label={Text("مبلغ (تومان؛ نقطه برای اعشار)") },keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),isError=amount.isNotBlank() && parseMoney(amount)==null,supportingText={Text("مثال: 16500.5 یا ۱۶۵۰۰٫۵؛ ویرگول برای هزارگان")})
   Row {FilterChip(plus,{plus=true},label={Text("+ واریز")});Spacer(Modifier.width(10.dp));FilterChip(!plus,{plus=false},label={Text("− برداشت")})}
   OutlinedButton(onClick={picker=true}){Text("تاریخ شمسی: "+jalali(date))}
- }},confirmButton={TextButton(onClick={val v=parseMoney(amount);if(subject.isNotBlank()&&v!=null&&v>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
+ }},confirmButton={TextButton(onClick={val v=parseMoney(amount);if(subject.isNotBlank()&&v!=null&&v.signum()>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})
  if(picker)PersianPicker(date,{picker=false}){date=it;picker=false}
 }
 internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
@@ -400,10 +401,4 @@ internal fun calendarWeekCount(startOffset:Int,daysInMonth:Int):Int {
 
 @Composable private fun OutLinedRepeatInput(value:String,change:(String)->Unit){
  OutlinedTextField(value,change,label={Text("فاصله تکرار (دقیقه، ۱ تا ۱۴۴۰)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.fillMaxWidth())
-}
-
-internal fun parseMoney(input:String):Long? {
- val digits=input.trim().replace(".","").replace(",","").replace("٬","")
- if(digits.isEmpty() || !digits.all{it.isDigit()})return null
- return digits.toLongOrNull()
 }

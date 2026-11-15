@@ -3,9 +3,9 @@ import org.junit.Assert.*
 import org.junit.Test
 class SecureInputTest {
  @Test fun moneyThousandSeparators() {
-  assertEquals(22500L,parseMoney("22.500"))
-  assertEquals(22500L,parseMoney("22,500"))
-  assertEquals(22500L,parseMoney("22500"))
+  assertEquals(java.math.BigDecimal("22.5"),parseMoney("22.500"))
+  assertEquals(java.math.BigDecimal("22500").stripTrailingZeros(),parseMoney("22,500"))
+  assertEquals(java.math.BigDecimal("22500").stripTrailingZeros(),parseMoney("22500"))
  }
  @Test fun rejectInvalidAmounts() {
   assertNull(parseMoney(""))
