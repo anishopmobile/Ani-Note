@@ -1,0 +1,69 @@
+name: Capture NotePlus Bazaar Screenshots
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Prepare instrumentation identity
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANI_RECOVERY_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/screenshots.p12"
+          echo "ANI_KEYSTORE=$RUNNER_TEMP/screenshots.p12" >> "$GITHUB_ENV"
+      - name: Build screenshot instrumentation only
+        env:
+          ANI_STORE_PASSWORD: ${{ secrets.ANI_RECOVERY_STORE_PASSWORD }}
+        run: |
+          mkdir -p app/src/main/res/font
+          curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
+          gradle --no-daemon assembleDebugAndroidTest
+          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/recovery-v306702/Ani-Note-recovery-306702.apk -o /tmp/noteplus.apk
+          echo '4921b628fd4aab901e5754460ef6a715083fce5ece00d0cae6df8c2cfe272602  /tmp/noteplus.apk' | sha256sum --check
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Capture real published screens with synthetic data
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb shell wm size 1080x1920
+            adb shell wm density 400
+            adb shell settings put global sysui_demo_allowed 1
+            adb shell am broadcast -a com.android.systemui.demo -e command enter
+            adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941
+            adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+            adb install /tmp/noteplus.apk
+            adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e class com.anishop.aninote.BazaarScreenshotsTest -e phase screenshots com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/screenshot-test.txt
+            mkdir -p market-screenshots
+            adb pull /sdcard/Android/data/com.anishop.aninote.recovery/files/bazaar-screenshots/. market-screenshots/
+            grep -q 'OK (' /tmp/screenshot-test.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NotePlus-Bazaar-Screenshots
+          path: |
+            market-screenshots/*.png
+            /tmp/screenshot-test.txt
+          if-no-files-found: error
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/screenshots.p12"
