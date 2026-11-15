@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.platform.LocalContext
 import org.json.JSONArray
@@ -306,13 +307,19 @@ class MainActivity:FragmentActivity() {
  if(askDelete) DeleteDialog({delete();askDelete=false},{askDelete=false})
 }
 @Composable fun AccountEditor(a:Account,update:(Account)->Unit,delete:()->Unit,export:()->Unit) {
- var add by remember { mutableStateOf(false) };var editing by remember { mutableStateOf<Entry?>(null) };var rename by remember { mutableStateOf(false) };var name by remember(a.id){ mutableStateOf(a.title) };var askDelete by remember { mutableStateOf(false) }
+ var add by remember { mutableStateOf(false) };var editing by remember { mutableStateOf<Entry?>(null) };var rename by remember { mutableStateOf(false) };var name by remember(a.id){ mutableStateOf(a.title) };var askDelete by remember { mutableStateOf(false) };var deletingEntry by remember(a.id){mutableStateOf<Entry?>(null)}
  Row(verticalAlignment=Alignment.CenterVertically){Text(a.title,style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));IconButton(onClick=export){Icon(Icons.Default.PictureAsPdf,"گزارش PDF")};IconButton(onClick={rename=true}){Icon(Icons.Default.Edit,"ویرایش عنوان")};IconButton(onClick={askDelete=true}){Icon(Icons.Default.DeleteOutline,"حذف حساب")}}
  Card(colors=CardDefaults.cardColors(containerColor=blue)){Column(Modifier.fillMaxWidth().padding(20.dp)){Text("مانده حساب",color=Color.White);Text(money(a.entries.sumOf{it.amount}),color=Color.White,style=MaterialTheme.typography.titleLarge)}}
  Spacer(Modifier.height(12.dp))
  Button(onClick={editing=null;add=true},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text(" ثبت گردش جدید")}
  Spacer(Modifier.height(12.dp))
- LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(a.entries.sortedByDescending{it.date},key={it.id}){e->ElevatedCard{ Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.subject);Text(jalali(e.date),color=Color.Gray)};Text((if(e.amount.signum()>0)"+"else "")+money(e.amount),color=if(e.amount.signum()>=0)Color(0xFF16804A)else Color.Red);IconButton(onClick={editing=e;add=true}){Icon(Icons.Default.Edit,"ویرایش")};IconButton(onClick={update(a.copy(entries=a.entries.filterNot{it.id==e.id}))}){Icon(Icons.Default.DeleteOutline,"حذف")}} }} }
+ LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(a.entries.sortedByDescending{it.date},key={it.id}){e->ElevatedCard{ Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(e.subject);Text(jalali(e.date),color=Color.Gray)};Text((if(e.amount.signum()>0)"+"else "")+money(e.amount),color=if(e.amount.signum()>=0)Color(0xFF16804A)else Color.Red);IconButton(onClick={editing=e;add=true}){Icon(Icons.Default.Edit,"ویرایش گردش "+e.subject)};IconButton(onClick={deletingEntry=e}){Icon(Icons.Default.DeleteOutline,"حذف گردش "+e.subject)}} }} }
+ deletingEntry?.let { target ->
+  AlertDialog(onDismissRequest={deletingEntry=null},title={Text("حذف گردش حساب")},
+   text={Text("آیا از حذف این گردش مطمئن هستید؟\n"+target.subject+"\n"+money(target.amount)+"\nفقط همین گردش حذف می‌شود.")},
+   confirmButton={TextButton(onClick={update(a.copy(entries=a.entries.filterNot{it.id==target.id}));deletingEntry=null}){Text("حذف این گردش")}},
+   dismissButton={TextButton(onClick={deletingEntry=null}){Text("انصراف")}})
+ }
  if(add) EntryForm(editing,{add=false}){e->update(a.copy(entries=if(editing==null)a.entries+e else a.entries.map{if(it.id==e.id)e else it}));add=false}
  if(rename) AlertDialog(onDismissRequest={rename=false},title={Text("ویرایش عنوان حساب")},text={OutlinedTextField(name,{name=it})},confirmButton={TextButton(onClick={if(name.isNotBlank()){update(a.copy(title=name));rename=false}}){Text("ذخیره")}})
  if(askDelete) DeleteDialog(delete,{askDelete=false})
@@ -320,7 +327,7 @@ class MainActivity:FragmentActivity() {
 @Composable fun EntryForm(existing:Entry?,dismiss:()->Unit,save:(Entry)->Unit) {
  var subject by remember(existing?.id){mutableStateOf(existing?.subject?:"")};var amount by remember(existing?.id){mutableStateOf(existing?.amount?.let{editableMoney(it)}?:"")};var plus by remember(existing?.id){mutableStateOf((existing?.amount?.signum()?:0)>=0)};var date by remember(existing?.id){mutableLongStateOf(existing?.date?:System.currentTimeMillis())};var picker by remember{mutableStateOf(false)}
  AlertDialog(onDismissRequest=dismiss,title={Text("گردش حساب")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it},label={Text("مبلغ (تومان؛ نقطه برای اعشار)") },keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),isError=amount.isNotBlank() && parseMoney(amount)==null,supportingText={Text("مثال: 16500.5 یا ۱۶۵۰۰٫۵؛ ویرگول برای هزارگان")})
+  OutlinedTextField(subject,{subject=it},label={Text("موضوع")});OutlinedTextField(amount,{amount=it},visualTransformation=AmountVisualTransformation,textStyle=LocalTextStyle.current.copy(textDirection=TextDirection.Ltr),label={Text("مبلغ (تومان؛ نقطه برای اعشار)") },keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),isError=amount.isNotBlank() && parseMoney(amount)==null,supportingText={Text("مثال: 1,500,000.5؛ نقطه برای اعشار است")})
   Row {FilterChip(plus,{plus=true},label={Text("+ واریز")});Spacer(Modifier.width(10.dp));FilterChip(!plus,{plus=false},label={Text("− برداشت")})}
   OutlinedButton(onClick={picker=true}){Text("تاریخ شمسی: "+jalali(date))}
  }},confirmButton={TextButton(onClick={val v=parseMoney(amount);if(subject.isNotBlank()&&v!=null&&v.signum()>0)save(Entry(existing?.id?:UUID.randomUUID().toString(),subject,if(plus)v else -v,date))}){Text("ذخیره")}},dismissButton={TextButton(onClick=dismiss){Text("انصراف")}})

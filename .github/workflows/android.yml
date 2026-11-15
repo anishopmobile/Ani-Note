@@ -1,12 +1,12 @@
 name: Build Independent Ani Note APK
 on:
   push:
-    branches: [release/recovery-decimals]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: recovery-release-${{ github.ref }}
+  group: recovery-release
   cancel-in-progress: false
 env:
   EXPECTED_SIGNER: 5fe39e20cad0ed02b05a41d7a4908f1b285c8721eedbce18b8718a08fe20c8e9
@@ -103,8 +103,10 @@ jobs:
           diff -u /tmp/first-cert /tmp/second-cert
           echo 'Two independent builds have the same verified signing certificate.' > signing-verification.txt
           cat /tmp/second-cert >> signing-verification.txt
-      - name: Download original app for coexistence verification
-        run: curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/original.apk
+      - name: Download published versions for coexistence and upgrade tests
+        run: |
+          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/original.apk
+          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/recovery-v306202/Ani-Note-recovery-306202.apk -o /tmp/published-recovery.apk
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -119,10 +121,11 @@ jobs:
           script: |
             adb install /tmp/original.apk
             adb shell dumpsys package com.anishop.aninote > /tmp/original-before.txt
-            adb install first-build/first.apk
+            adb install /tmp/published-recovery.apk
             adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w -e phase seed com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/seed.txt
             grep -q 'OK (' /tmp/seed.txt
+            adb install -r first-build/first.apk
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell am instrument -w -e phase verify com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/verify.txt
             grep -q 'OK (' /tmp/verify.txt

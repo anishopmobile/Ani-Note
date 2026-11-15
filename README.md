@@ -29,3 +29,10 @@ New amounts are stored as exact decimal strings in the existing encrypted accoun
 The original main signing key was not recoverable. The authorized recovery release lives on `release/recovery-decimals` and uses `com.anishop.aninote.recovery`, preserving the existing installation. See [migration instructions](docs/RECOVERY-MIGRATION.md). The new channel only accepts `recovery-v` release tags and matching recovery APK assets.
 
 Required repository Secrets: `ANI_RECOVERY_KEYSTORE_BASE64` (PKCS12, alias `ani-note-recovery`) and `ANI_RECOVERY_STORE_PASSWORD`. The same protected key is restored independently in two CI jobs; certificate fingerprints are pinned and compared before publication. Neither job generates keys or stores them in Actions cache. Missing Secrets or a changed certificate stops publication. A Windows-user DPAPI protected local backup is kept outside the repository. Never add private keys, password files or that backup to commits or artifacts.
+
+
+## Main release channel
+
+`main` now continues the independent release with the fixed applicationId `com.anishop.aninote.recovery` and the existing pinned recovery signing certificate. It uses the same `ANI_RECOVERY_KEYSTORE_BASE64` / `ANI_RECOVERY_STORE_PASSWORD` Secrets and `recovery-v` update channel. No signing key is regenerated and no migration to a different installation ID is performed for subsequent updates.
+
+Account amount entry displays automatic three-digit grouping without modifying the raw decimal value, with caret offsets mapped around the display separators. A dot remains the decimal separator. Deleting a single entry now requires an explicit confirmation that identifies its subject and amount; cancellation leaves the entry unchanged. CI covers grouping/caret mapping, UI cancellation/confirmation, save/edit of grouped decimals and upgrading from the published independent APK 306202 without uninstalling it.
