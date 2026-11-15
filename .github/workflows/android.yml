@@ -1,14 +1,17 @@
-name: Build Ani Note Main APK
+name: Build Independent Ani Note APK
 on:
   push:
-    branches: [main, feature/calendar-widgets-icon, fix/decimal-account-amounts]
+    branches: [release/recovery-decimals]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: recovery-release-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  EXPECTED_SIGNER: 5fe39e20cad0ed02b05a41d7a4908f1b285c8721eedbce18b8718a08fe20c8e9
 jobs:
-  checks:
-    permissions:
-      contents: read
+  first_build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,126 +22,144 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Install Vazirmatn font
-        run: |
-          mkdir -p app/src/main/res/font
-          curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
-      - name: Test exact decimals, lint and build test APKs
-        run: gradle --no-daemon testDebugUnitTest lintRelease assembleDebug assembleDebugAndroidTest
-      - name: Enable emulator acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Test legacy data and decimal save, edit and backup on Android
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          arch: x86_64
-          disable-animations: true
-          script: |
-            adb install app/build/outputs/apk/debug/app-debug.apk
-            adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -e phase seed com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/seed.txt
-            grep -q 'OK (' /tmp/seed.txt
-            adb shell am instrument -w -e phase verify com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/verify.txt
-            grep -q 'OK (' /tmp/verify.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: decimal-check-reports
-          path: |
-            app/build/reports/
-            /tmp/seed.txt
-            /tmp/verify.txt
-  build:
-    needs: checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Restore stable main signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/ani-main.keystore
-          key: ani-main-signing-v1
-      - name: Prepare signing and version
+      - name: Restore protected signing identity from Secrets
         env:
-          MAIN_KEYSTORE_BASE64: ${{ secrets.MAIN_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.ANI_RECOVERY_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.android"
-          key="$HOME/.android/ani-main.keystore"
-          if [ -n "$MAIN_KEYSTORE_BASE64" ]; then
-            printf '%s' "$MAIN_KEYSTORE_BASE64" | base64 --decode > "$key"
-          fi
-          if [ ! -f "$key" ]; then
-            echo 'Signing key unavailable: restore MAIN_KEYSTORE_BASE64' >&2
-            exit 1
-          fi
-          echo "ANI_KEYSTORE=$key" >> "$GITHUB_ENV"
-          echo "ANI_VERSION_CODE=$((200000 + ${{ github.run_number }} * 100 + ${{ github.run_attempt }}))" >> "$GITHUB_ENV"
-          keytool -list -v -keystore "$key" -storepass android -alias androiddebugkey | grep 'SHA256:' > signing-fingerprint.txt
-      - name: Install Vazirmatn font
+          test -n "$KEYSTORE_BASE64"
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ani-release.p12"
+          echo "ANI_KEYSTORE=$RUNNER_TEMP/ani-release.p12" >> "$GITHUB_ENV"
+          echo "ANI_VERSION_CODE=$((300000 + ${{ github.run_number }} * 100 + ${{ github.run_attempt }} * 2 - 1))" >> "$GITHUB_ENV"
+      - name: Test, lint and build first signed APK
+        env:
+          ANI_STORE_PASSWORD: ${{ secrets.ANI_RECOVERY_STORE_PASSWORD }}
         run: |
+          set -euo pipefail
           mkdir -p app/src/main/res/font
           curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
-      - name: Test, lint and build
-        run: gradle --no-daemon testDebugUnitTest lintRelease assembleRelease assembleDebugAndroidTest
-      - name: Download previous main APK for upgrade test
+          gradle --no-daemon testDebugUnitTest lintRelease assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk first.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs first.apk > first-signature.txt
+          grep -Fq "Signer #1 certificate SHA-256 digest: $EXPECTED_SIGNER" first-signature.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-signed-build
+          path: |
+            first.apk
+            first-signature.txt
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-and-lint-reports
+          path: app/build/reports/
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/ani-release.p12"
+  verified_build:
+    needs: first_build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Restore the same signing identity on a fresh runner
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANI_RECOVERY_KEYSTORE_BASE64 }}
         run: |
-          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/previous.apk
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64"
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ani-release.p12"
+          echo "ANI_KEYSTORE=$RUNNER_TEMP/ani-release.p12" >> "$GITHUB_ENV"
+          echo "ANI_VERSION_CODE=$((300000 + ${{ github.run_number }} * 100 + ${{ github.run_attempt }} * 2))" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-signed-build
+          path: first-build
+      - name: Build next version and compare both certificate fingerprints
+        env:
+          ANI_STORE_PASSWORD: ${{ secrets.ANI_RECOVERY_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/res/font
+          curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf' -o app/src/main/res/font/vazirmatn.ttf
+          gradle --no-daemon assembleRelease assembleDebugAndroidTest
+          cp app/build/outputs/apk/release/app-release.apk "Ani-Note-recovery-$ANI_VERSION_CODE.apk"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" verify --verbose --print-certs "Ani-Note-recovery-$ANI_VERSION_CODE.apk" > second-signature.txt
+          grep -Fq "Signer #1 certificate SHA-256 digest: $EXPECTED_SIGNER" second-signature.txt
+          grep 'certificate SHA-256 digest:' first-build/first-signature.txt > /tmp/first-cert
+          grep 'certificate SHA-256 digest:' second-signature.txt > /tmp/second-cert
+          diff -u /tmp/first-cert /tmp/second-cert
+          echo 'Two independent builds have the same verified signing certificate.' > signing-verification.txt
+          cat /tmp/second-cert >> signing-verification.txt
+      - name: Download original app for coexistence verification
+        run: curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/original.apk
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Test upgrade from published APK and decimal persistence
+      - name: Test coexistence, backup migration and in-place recovery upgrade
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
           arch: x86_64
           disable-animations: true
           script: |
-            adb install /tmp/previous.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -e phase seed com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/seed.txt
+            adb install /tmp/original.apk
+            adb shell dumpsys package com.anishop.aninote > /tmp/original-before.txt
+            adb install first-build/first.apk
+            adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e phase seed com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/seed.txt
             grep -q 'OK (' /tmp/seed.txt
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell am instrument -w -e phase verify com.anishop.aninote.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/verify.txt
+            adb shell am instrument -w -e phase verify com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/verify.txt
             grep -q 'OK (' /tmp/verify.txt
+            adb shell pm path com.anishop.aninote | grep 'package:'
+            adb shell pm path com.anishop.aninote.recovery | grep 'package:'
+            adb shell dumpsys package com.anishop.aninote > /tmp/original-after.txt
+            grep 'versionCode=' /tmp/original-before.txt > /tmp/original-version-before.txt
+            grep 'versionCode=' /tmp/original-after.txt > /tmp/original-version-after.txt
+            diff -u /tmp/original-version-before.txt /tmp/original-version-after.txt
+            adb shell am start -W -n com.anishop.aninote.recovery/com.anishop.aninote.MainActivity
+      - name: Package verified installable APK
+        run: |
+          sha256sum "Ani-Note-recovery-$ANI_VERSION_CODE.apk" > SHA256SUMS
+          cp docs/RECOVERY-MIGRATION.md RECOVERY-MIGRATION.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ani-Note-Independent-APK
+          path: |
+            Ani-Note-recovery-*.apk
+            SHA256SUMS
+            signing-verification.txt
+            RECOVERY-MIGRATION.md
+          if-no-files-found: error
+      - name: Publish independent update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "recovery-v$ANI_VERSION_CODE" "Ani-Note-recovery-$ANI_VERSION_CODE.apk" SHA256SUMS signing-verification.txt RECOVERY-MIGRATION.md --target "$GITHUB_SHA" --title "یادداشت معمار جدید $ANI_VERSION_CODE" --notes-file docs/RECOVERY-MIGRATION.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: decimal-validation-reports
+          name: migration-and-upgrade-reports
           path: |
-            app/build/reports/
             /tmp/seed.txt
             /tmp/verify.txt
-      - name: Prepare main APK
-        run: |
-          cp app/build/outputs/apk/release/app-release.apk Ani-Note-main.apk
-          sha256sum Ani-Note-main.apk > SHA256SUMS
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Ani-Note-main.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Ani-Note-Main-APK
-          path: |
-            Ani-Note-main.apk
-            SHA256SUMS
-            signing-fingerprint.txt
-          if-no-files-found: error
-
-      - name: Publish main release for in-app update checks
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cp Ani-Note-main.apk "Ani-Note-main-$ANI_VERSION_CODE.apk"
-          gh release create "main-v$ANI_VERSION_CODE" "Ani-Note-main-$ANI_VERSION_CODE.apk" SHA256SUMS --target "$GITHUB_SHA" --title "Ani Note $ANI_VERSION_CODE" --notes "Official main-channel APK. Install only if app signing keys match. Back up your data before upgrading."
+            /tmp/original-version-before.txt
+            /tmp/original-version-after.txt
+            second-signature.txt
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/ani-release.p12"

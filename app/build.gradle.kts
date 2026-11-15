@@ -5,17 +5,27 @@ android {
  val buildCode = providers.environmentVariable("ANI_VERSION_CODE").orElse("2").get().toInt()
  require(buildCode in 2..2100000000)
  defaultConfig {
-  applicationId = "com.anishop.aninote"; minSdk = 26; targetSdk = 35
-  versionCode = buildCode; versionName = "1.3.$buildCode"
+  applicationId = "com.anishop.aninote.recovery"; minSdk = 26; targetSdk = 35
+  versionCode = buildCode; versionName = "1.4.$buildCode"
   testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
  }
  signingConfigs.getByName("debug") {
+  providers.environmentVariable("ANI_KEYSTORE").orNull?.let {
+   storeFile = file(it); storeType = "PKCS12"
+   storePassword = providers.environmentVariable("ANI_STORE_PASSWORD").get()
+   keyPassword = storePassword; keyAlias = "ani-note-recovery"
+  }
+ }
+ signingConfigs.create("distribution") {
   providers.environmentVariable("ANI_KEYSTORE").orNull?.let { storeFile = file(it) }
+  storeType = "PKCS12"; keyAlias = "ani-note-recovery"
+  storePassword = providers.environmentVariable("ANI_STORE_PASSWORD").orNull
+  keyPassword = storePassword
  }
  buildTypes.getByName("release") {
   isDebuggable = false
   isMinifyEnabled = false
-  signingConfig = signingConfigs.getByName("debug")
+  signingConfig = signingConfigs.getByName("distribution")
  }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }

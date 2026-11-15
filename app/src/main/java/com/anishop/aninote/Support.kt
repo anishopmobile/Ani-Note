@@ -69,6 +69,7 @@ object BackupCodec {
    .putInt("repeat_minutes",j.optInt("repeat_minutes",2)).commit()
   check(ok){"Failed to write backup"}
   Alarms.sync(repo.context,repo.notes())
+  AniWidget.refresh(repo.context)
  }
 }
 object NotificationSounds {

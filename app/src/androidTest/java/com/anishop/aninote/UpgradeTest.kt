@@ -16,13 +16,17 @@ class UpgradeTest {
   val account="""[{"id":"legacy-account","title":"حساب قدیمی","entries":[{"id":"entry","subject":"تست","amount":22500,"date":1234}]}]"""
   if(phase=="seed") {
    assertTrue(p.edit().putString("notes",note).putString("accounts",account).putBoolean("calendar_events",false).commit())
-   // Migrate one record now; keep the other plaintext until after the APK upgrade.
+   // Seed encrypted legacy records plus a genuine decimal entry before the next APK upgrade.
    assertEquals(note,EncryptedStore(context).read("notes"))
+   val repo=Repo(context)
+   val legacy=repo.accounts().single()
+   repo.saveAccounts(listOf(legacy.copy(entries=legacy.entries+Entry(id="decimal-upgrade",subject="اعشار قبل از آپدیت",amount=parseMoney("16500.5")!!))))
    return
   }
   val repo=Repo(context)
   assertEquals("یادداشت قدیمی",repo.notes().single().parts.single().title)
-  assertEquals(0,java.math.BigDecimal("22500").compareTo(repo.accounts().single().entries.single().amount))
+  assertEquals(0,java.math.BigDecimal("22500").compareTo(repo.accounts().single().entries.first().amount))
+  assertEquals("16500.5",editableMoney(repo.accounts().single().entries.last().amount))
   assertFalse(p.getBoolean("calendar_events",true))
   assertTrue(p.getString("notes","")!!.startsWith("gcm:"))
   assertTrue(p.getString("accounts","")!!.startsWith("gcm:"))

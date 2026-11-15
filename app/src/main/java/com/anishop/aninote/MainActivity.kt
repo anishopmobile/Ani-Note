@@ -157,7 +157,7 @@ class MainActivity:FragmentActivity() {
  CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
  Scaffold(topBar={ Row(Modifier.fillMaxWidth().background(Color.White).padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
   if(openNote!=null || openAccount!=null) IconButton(onClick={openNote=null;openAccount=null}){ Icon(Icons.Default.ArrowForward,"بازگشت") }
-  Column(Modifier.weight(1f)) { Text("Ani Note",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
+  Column(Modifier.weight(1f)) { Text("یادداشت معمار جدید",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
  } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.CalendarMonth,null)},label={Text("تقویم")});NavigationBarItem(selected=tab==3,onClick={tab=3},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
  floatingActionButton={ if(openNote==null && openAccount==null && tab<2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
@@ -165,7 +165,16 @@ class MainActivity:FragmentActivity() {
  when {
  openNote!=null -> { val n=notes.firstOrNull{it.id==openNote}; if(n!=null) NoteEditor(n,::changeNote,{notes.removeAll{it.id==n.id};repo.saveNotes(notes);openNote=null},{exportPdf(n.parts.firstOrNull()?.title ?: "یادداشت",n.parts.flatMapIndexed{index,p->listOf("بخش "+(index+1)+" — "+p.title,p.body)+ (if(p.alarm>0)listOf("یادآوری: "+jalali(p.alarm)+" "+clock(p.alarm))else emptyList())})}) }
  openAccount!=null -> { val a=accounts.firstOrNull{it.id==openAccount}; if(a!=null) AccountEditor(a,::changeAccount,{accounts.removeAll{it.id==a.id};repo.saveAccounts(accounts);openAccount=null},{exportPdf(a.title,listOf("مانده حساب: "+money(a.entries.sumOf{it.amount})) + a.entries.map{it.subject+" | "+money(it.amount)+" | "+jalali(it.date)})}) }
- tab==0 -> { var q by remember { mutableStateOf("") }; Text("یادداشت‌های من",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(10.dp))
+ tab==0 -> {
+  if(notes.isEmpty() && accounts.isEmpty()) {
+   ElevatedCard { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text("انتقال اطلاعات از برنامهٔ قبلی",style=MaterialTheme.typography.titleMedium)
+    Text("برنامهٔ قبلی را نگه دارید. در تنظیمات آن «تهیه بکاپ» را بزنید، سپس فایل را اینجا بازیابی کنید. پس از انتقال، تعداد یادداشت‌ها و حساب‌ها و مانده‌ها را بررسی کنید.")
+    OutlinedButton(onClick={importLauncher.launch(arrayOf("application/json","text/plain","application/octet-stream"))}){Text("بازیابی بکاپ برنامهٔ قبلی")}
+   }}
+   Spacer(Modifier.height(12.dp))
+  }
+ var q by remember { mutableStateOf("") }; Text("یادداشت‌های من",style=MaterialTheme.typography.titleLarge); Spacer(Modifier.height(10.dp))
   OutlinedTextField(q,{q=it},Modifier.fillMaxWidth(),placeholder={Text("جستجو...")},leadingIcon={Icon(Icons.Default.Search,null)})
   Spacer(Modifier.height(12.dp))
   LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)) { items(notes.filter{n->n.parts.any{it.title.contains(q,true)||it.body.contains(q,true)}},key={it.id}) { n ->
@@ -256,7 +265,7 @@ class MainActivity:FragmentActivity() {
   Spacer(Modifier.height(16.dp))
   ElevatedCard{Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
    Text("انتقال و نگهداری اطلاعات",style=MaterialTheme.typography.titleMedium)
-   Text("بکاپ شامل همه یادداشت‌ها، حساب‌ها و تنظیمات است.",color=Color.Gray)
+   Text("بکاپ شامل یادداشت‌ها، حساب‌ها و تنظیمات پخش یادآور است. قفل ورود و ویجت‌ها را در برنامهٔ جدید دوباره تنظیم کنید. برنامهٔ قبلی را تا بررسی کامل اطلاعات نگه دارید.",color=Color.Gray)
    Button(onClick={backupLauncher.launch("AniNote-backup.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.SaveAlt,null);Text(" تهیه بکاپ")}
    OutlinedButton(onClick={importLauncher.launch(arrayOf("application/json","text/plain","application/octet-stream"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,null);Text(" بازیابی از فایل بکاپ")}
   }}
