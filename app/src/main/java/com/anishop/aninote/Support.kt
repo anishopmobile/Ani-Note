@@ -80,7 +80,7 @@ object NotificationSounds {
   val uri=if(sound.isBlank())RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) else Uri.parse(sound)
   val attributes=AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
-  val channel=NotificationChannel(id,"یادآورهای Ani Note",NotificationManager.IMPORTANCE_HIGH)
+  val channel=NotificationChannel(id,"یادآورهای NotePlus",NotificationManager.IMPORTANCE_HIGH)
   channel.setSound(uri,attributes)
   manager.createNotificationChannel(channel)
   return id
@@ -125,7 +125,7 @@ object PdfReports {
    y+=layout.height+16
   }
   line(title,titlePaint)
-  line("Ani Note | "+jalali(System.currentTimeMillis()),textPaint)
+  line("NotePlus | "+jalali(System.currentTimeMillis()),textPaint)
   for(row in lines)line(row.ifBlank{" "},textPaint)
   if(page!=null)pdf.finishPage(page!!)
   val out=ByteArrayOutputStream()

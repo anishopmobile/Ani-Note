@@ -48,7 +48,7 @@ class AlarmReceiver:BroadcastReceiver(){
   try{c.startForegroundService(intent)}catch(e:Exception){
    android.util.Log.e("AniNoteAlarm","Foreground reminder failed",e)
    val mgr=c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-   mgr.createNotificationChannel(NotificationChannel("ani_fallback","یادآورهای Ani Note",NotificationManager.IMPORTANCE_HIGH))
+   mgr.createNotificationChannel(NotificationChannel("ani_fallback","یادآورهای NotePlus",NotificationManager.IMPORTANCE_HIGH))
    if(Build.VERSION.SDK_INT<33 || c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED){
     val stop=PendingIntent.getBroadcast(c,id.hashCode(),Intent(c,ReminderStopReceiver::class.java).putExtra("id",id).putExtra("at",at),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     mgr.notify(id.hashCode().let{if(it==0)1 else it},Notification.Builder(c,"ani_fallback").setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle(part.title.ifBlank{"یادآوری"}).setContentText(part.body).addAction(Notification.Action.Builder(android.R.drawable.ic_media_pause,"توقف یادآوری",stop).build()).build())

@@ -48,7 +48,7 @@ import androidx.compose.foundation.text.KeyboardOptions
  var error by remember{mutableStateOf("")}
  MaterialTheme{
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
-   Text("Ani Note",style=MaterialTheme.typography.headlineMedium)
+   Text("NotePlus",style=MaterialTheme.typography.headlineMedium)
    Text("برای دسترسی به اطلاعات، هویت خود را تأیید کنید")
    Spacer(Modifier.height(18.dp))
    if(access.hasPin())TextButton(onClick={mode="pin";value=""}){Text("ورود با رمز")}

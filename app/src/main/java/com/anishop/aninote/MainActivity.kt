@@ -87,7 +87,7 @@ class MainActivity:FragmentActivity() {
   val p=BiometricPrompt(this,androidx.core.content.ContextCompat.getMainExecutor(this),object:BiometricPrompt.AuthenticationCallback(){
    override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){unlocked=true}
   })
-  val builder=BiometricPrompt.PromptInfo.Builder().setTitle("ورود به Ani Note").setAllowedAuthenticators(method)
+  val builder=BiometricPrompt.PromptInfo.Builder().setTitle("ورود به NotePlus").setAllowedAuthenticators(method)
   if(!device)builder.setNegativeButtonText("انصراف")
   p.authenticate(builder.build())
  }
@@ -158,7 +158,7 @@ class MainActivity:FragmentActivity() {
  CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
  Scaffold(topBar={ Row(Modifier.fillMaxWidth().background(Color.White).padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
   if(openNote!=null || openAccount!=null) IconButton(onClick={openNote=null;openAccount=null}){ Icon(Icons.Default.ArrowForward,"بازگشت") }
-  Column(Modifier.weight(1f)) { Text("یادداشت معمار جدید",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
+  Column(Modifier.weight(1f)) { Text("NotePlus",style=MaterialTheme.typography.titleLarge,color=blue); Text("دفتر هوشمند فارسی",style=MaterialTheme.typography.bodyMedium) }
   Icon(Icons.Default.AutoAwesome,null,tint=blue)
  } },bottomBar={ if(openNote==null && openAccount==null) NavigationBar { NavigationBarItem(selected=tab==0,onClick={tab=0},icon={Icon(Icons.Default.Description,null)},label={Text("یادداشت‌ها")}); NavigationBarItem(selected=tab==1,onClick={tab=1},icon={Icon(Icons.Default.AccountBalanceWallet,null)},label={Text("مدیریت حساب")}); NavigationBarItem(selected=tab==2,onClick={tab=2},icon={Icon(Icons.Default.CalendarMonth,null)},label={Text("تقویم")});NavigationBarItem(selected=tab==3,onClick={tab=3},icon={Icon(Icons.Default.Settings,null)},label={Text("تنظیمات")}) } },
  floatingActionButton={ if(openNote==null && openAccount==null && tab<2) FloatingActionButton(onClick={ if(tab==0){ val n=Note(); notes.add(0,n);repo.saveNotes(notes);openNote=n.id } else {accountName="";newAccount=true} },containerColor=blue,contentColor=Color.White){Icon(Icons.Default.Add,"افزودن")} }
@@ -230,7 +230,7 @@ class MainActivity:FragmentActivity() {
   Spacer(Modifier.height(14.dp))
   ElevatedCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
    Text("ویجت‌های صفحه اصلی",style=MaterialTheme.typography.titleMedium)
-   Text("برای افزودن ویجت از فهرست ویجت‌های لانچر گوشی، Ani Note را انتخاب کنید.")
+   Text("برای افزودن ویجت از فهرست ویجت‌های لانچر گوشی، NotePlus را انتخاب کنید.")
    Row(verticalAlignment=Alignment.CenterVertically){
     Text("نمایش محتوای خصوصی در ویجت",Modifier.weight(1f))
     Switch(revealWidgets,{revealWidgets=it;context.getSharedPreferences("widget_prefs",0).edit().putBoolean("reveal",it).apply();AniWidget.refresh(context)})

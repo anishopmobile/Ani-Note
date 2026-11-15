@@ -36,3 +36,10 @@ Required repository Secrets: `ANI_RECOVERY_KEYSTORE_BASE64` (PKCS12, alias `ani-
 `main` now continues the independent release with the fixed applicationId `com.anishop.aninote.recovery` and the existing pinned recovery signing certificate. It uses the same `ANI_RECOVERY_KEYSTORE_BASE64` / `ANI_RECOVERY_STORE_PASSWORD` Secrets and `recovery-v` update channel. No signing key is regenerated and no migration to a different installation ID is performed for subsequent updates.
 
 Account amount entry displays automatic three-digit grouping without modifying the raw decimal value, with caret offsets mapped around the display separators. A dot remains the decimal separator. Deleting a single entry now requires an explicit confirmation that identifies its subject and amount; cancellation leaves the entry unchanged. CI covers grouping/caret mapping, UI cancellation/confirmation, save/edit of grouped decimals and upgrading from the published independent APK 306202 without uninstalling it.
+
+
+## NotePlus branding and update verification
+
+The launcher label and visible product names are now NotePlus. The applicationId, signing Secrets, pinned certificate, release tag prefix and compatible APK asset names remain unchanged so the installed 306402 updater continues to work. Only the Actions artifact title changes to NotePlus-APK.
+
+CI tests deterministic release selection for 306402 and future main versions, checks the production GitHub endpoint, and after publication launches the actual installed 306402 APK to press its original update-check button and verify discovery of the new release. It then upgrades that APK with seeded notes, decimal accounts, reminder/calendar preferences, widget selections and an enabled PIN lock, verifying all persisted settings and the new NotePlus label. A failed post-publication check returns the release to draft, and the final Actions artifact is only uploaded after success.

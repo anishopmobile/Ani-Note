@@ -1,4 +1,4 @@
-name: Build Independent Ani Note APK
+name: Build NotePlus APK
 on:
   push:
     branches: [main]
@@ -106,7 +106,7 @@ jobs:
       - name: Download published versions for coexistence and upgrade tests
         run: |
           curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/main-v205901/Ani-Note-main-205901.apk -o /tmp/original.apk
-          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/recovery-v306202/Ani-Note-recovery-306202.apk -o /tmp/published-recovery.apk
+          curl -fL --retry 3 https://github.com/anishopmobile/Ani-Note/releases/download/recovery-v306402/Ani-Note-recovery-306402.apk -o /tmp/published-recovery.apk
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -140,19 +140,42 @@ jobs:
         run: |
           sha256sum "Ani-Note-recovery-$ANI_VERSION_CODE.apk" > SHA256SUMS
           cp docs/RECOVERY-MIGRATION.md RECOVERY-MIGRATION.md
+      - name: Publish compatible NotePlus update
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "recovery-v$ANI_VERSION_CODE" "Ani-Note-recovery-$ANI_VERSION_CODE.apk" SHA256SUMS signing-verification.txt RECOVERY-MIGRATION.md --target "$GITHUB_SHA" --title "NotePlus $ANI_VERSION_CODE" --notes-file docs/RECOVERY-MIGRATION.md
+      - name: Verify installed 306402 discovers the published update and keeps all settings
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          force-avd-creation: true
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install /tmp/published-recovery.apk
+            adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e class com.anishop.aninote.UpdateDiscoveryUiTest -e phase published -e expected_code $ANI_VERSION_CODE com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/published-discovery.txt
+            grep -q 'OK (' /tmp/published-discovery.txt
+            adb shell am instrument -w -e class com.anishop.aninote.UpgradeTest -e phase seed -e lock true com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/settings-seed.txt
+            grep -q 'OK (' /tmp/settings-seed.txt
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb shell am instrument -w -e class com.anishop.aninote.UpgradeTest -e phase verify -e lock true com.anishop.aninote.recovery.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/settings-upgrade.txt
+            grep -q 'OK (' /tmp/settings-upgrade.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Ani-Note-Independent-APK
+          name: NotePlus-APK
           path: |
             Ani-Note-recovery-*.apk
             SHA256SUMS
             signing-verification.txt
             RECOVERY-MIGRATION.md
           if-no-files-found: error
-      - name: Publish independent update channel
+      - name: Hide release if post-publication verification fails
+        if: failure() && steps.publish.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "recovery-v$ANI_VERSION_CODE" "Ani-Note-recovery-$ANI_VERSION_CODE.apk" SHA256SUMS signing-verification.txt RECOVERY-MIGRATION.md --target "$GITHUB_SHA" --title "یادداشت معمار جدید $ANI_VERSION_CODE" --notes-file docs/RECOVERY-MIGRATION.md
+        run: gh release edit "recovery-v$ANI_VERSION_CODE" --draft
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -160,6 +183,9 @@ jobs:
           path: |
             /tmp/seed.txt
             /tmp/verify.txt
+            /tmp/published-discovery.txt
+            /tmp/settings-seed.txt
+            /tmp/settings-upgrade.txt
             /tmp/original-version-before.txt
             /tmp/original-version-after.txt
             second-signature.txt

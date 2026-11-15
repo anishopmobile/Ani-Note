@@ -29,12 +29,17 @@ object Updates {
   connection.connectTimeout=15000; connection.readTimeout=15000
   connection.instanceFollowRedirects=false
   connection.setRequestProperty("Accept","application/vnd.github+json")
-  connection.setRequestProperty("User-Agent","Ani-Note-Recovery")
+  connection.setRequestProperty("User-Agent","NotePlus")
   connection.useCaches=false
   try {
    check(connection.responseCode==200)
    val bytes=connection.inputStream.use{it.readBytesLimited(2_000_000)}
-   val releases=JSONArray(bytes.toString(Charsets.UTF_8))
+   return select(bytes.toString(Charsets.UTF_8),installed)
+  } finally {connection.disconnect()}
+ }
+ /** Match the stable recovery channel kept for compatibility with installed 306402. */
+ internal fun select(response:String,installed:Long):AvailableUpdate? {
+   val releases=JSONArray(response)
    val candidates=mutableListOf<AvailableUpdate>()
    for(i in 0 until releases.length()) {
     val release=releases.getJSONObject(i)
@@ -50,8 +55,8 @@ object Updates {
     }
    }
    return candidates.maxByOrNull{it.code}
-  } finally {connection.disconnect()}
  }
+
  private fun java.io.InputStream.readBytesLimited(limit:Int):ByteArray {
   val out=java.io.ByteArrayOutputStream(); val buffer=ByteArray(8192)
   while(true){val n=read(buffer);if(n<0)break;check(out.size()+n<=limit);out.write(buffer,0,n)}
@@ -72,7 +77,7 @@ object Updates {
  Button(enabled=!busy,onClick={
   busy=true;update=null
   scope.launch {
-   try{update=withContext(Dispatchers.IO){Updates.check(code)};message=if(update==null)"نسخه جدیدتری برای برنامه جدید منتشر نشده است." else "نسخه جدید آماده دریافت است."}
+   try{update=withContext(Dispatchers.IO){Updates.check(code)};message=if(update==null)"نسخه جدیدتری برای NotePlus منتشر نشده است." else "نسخه جدید آماده دریافت است."}
    catch(_:Exception){message="بررسی بروزرسانی ممکن نشد؛ اتصال اینترنت را بررسی و دوباره تلاش کنید."}
    finally{busy=false}
   }
